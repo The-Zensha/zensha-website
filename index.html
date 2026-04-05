@@ -1,0 +1,2138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZENSHA — Digital Systems Studio</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.cdnfonts.com/css/st-tokyo');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --void:    #ffffff;
+  --ink:     #f5f5f5;
+  --surface: #efefef;
+  --lift:    #e8e8e8;
+  --gold:    #CC0000;
+  --gold-lo: rgba(204,0,0,0.055);
+  --gold-md: rgba(204,0,0,0.13);
+  --gold-hi: rgba(204,0,0,0.4);
+  --text:    #000000;
+  --muted:   #2a2a2a;
+  --dim:     #666666;
+  --edge:    rgba(0,0,0,0.12);
+  --edge-g:  rgba(204,0,0,0.18);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--gold); color: #fff; }
+
+/* ── CURSOR ── */
+* { cursor: none !important; }
+#zs-cur-dot {
+  position: fixed; width: 6px; height: 6px;
+  background: var(--gold); border-radius: 50%;
+  pointer-events: none; z-index: 9999;
+  transform: translate(-50%, -50%);
+  transition: width .15s, height .15s, opacity .15s;
+  will-change: left, top;
+}
+#zs-cur-ring {
+  position: fixed; width: 30px; height: 30px;
+  border: 1px solid rgba(204,0,0,.35);
+  border-radius: 50%; pointer-events: none; z-index: 9998;
+  transform: translate(-50%, -50%);
+  transition: width .3s cubic-bezier(.16,1,.3,1),
+              height .3s cubic-bezier(.16,1,.3,1),
+              border-color .3s;
+  will-change: left, top;
+}
+body:has(a:hover) #zs-cur-ring,
+body:has(button:hover) #zs-cur-ring {
+  width: 54px; height: 54px;
+  border-color: rgba(204,0,0,.65);
+}
+
+/* ── FILM GRAIN ── */
+#zs-grain {
+  position: fixed; inset: 0; z-index: 998; pointer-events: none; opacity: .025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  animation: grainShift 1.8s steps(2) infinite;
+}
+@keyframes grainShift {
+  0%   { transform: translate(0,0); }
+  25%  { transform: translate(-3px, 2px); }
+  50%  { transform: translate(3px,-2px); }
+  75%  { transform: translate(-1px, 3px); }
+  100% { transform: translate(2px,-1px); }
+}
+
+/* ── PROGRESS BAR ── */
+#zs-bar {
+  position: fixed; top: 0; left: 0; width: 0%;
+  height: 2px; background: var(--gold); z-index: 701;
+  transition: width .08s linear;
+  box-shadow: 0 0 8px rgba(204,0,0,.4);
+}
+
+/* ── SCANLINE FLICKER ── */
+#zs-scan {
+  position: fixed; inset: 0; z-index: 997; pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,.006) 3px,
+    rgba(0,0,0,.006) 4px
+  );
+}
+
+/* ─────────────────────────────── NAV ─────────────────────────────── */
+.zs-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 600;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 38px 88px;
+  border-bottom: 1px solid transparent;
+  transition: padding .55s cubic-bezier(.16,1,.3,1),
+              background .55s, border-color .55s;
+}
+.zs-nav.stuck {
+  padding: 18px 88px;
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-color: var(--edge);
+}
+.zs-logo {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 1.55rem; letter-spacing: 9px; text-transform: uppercase;
+  color: var(--text); text-decoration: none; position: relative;
+}
+.zs-logo em { color: var(--gold); font-style: normal; }
+.zs-logo::after {
+  content: '';
+  position: absolute; bottom: -3px; left: 0; width: 0;
+  height: 1px; background: var(--gold);
+  transition: width .4s ease;
+}
+.zs-logo:hover::after { width: 100%; }
+
+.zs-nav-links { display: flex; gap: 48px; }
+.zs-nav-links a {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .56rem; letter-spacing: 3px; text-transform: uppercase;
+  color: #111; text-decoration: none;
+  transition: color .3s; position: relative;
+}
+.zs-nav-links a::after {
+  content: '';
+  position: absolute; bottom: -4px; left: 0; width: 0;
+  height: 1px; background: var(--gold);
+  transition: width .35s ease;
+}
+.zs-nav-links a:hover { color: var(--text); }
+.zs-nav-links a:hover::after { width: 100%; }
+
+.zs-nav-right { display: flex; align-items: center; gap: 28px; }
+.zs-live {
+  display: flex; align-items: center; gap: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .54rem; letter-spacing: 2.5px; text-transform: uppercase;
+  color: #111;
+}
+.zs-live-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--gold);
+  animation: livePulse 2.5s ease infinite;
+}
+@keyframes livePulse {
+  0%,100% { opacity:1; box-shadow:0 0 0 0 rgba(204,0,0,.55); }
+  50%      { opacity:.55; box-shadow:0 0 0 5px rgba(204,0,0,0); }
+}
+
+.zs-btn-primary {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .68rem; letter-spacing: 3.5px; text-transform: uppercase;
+  background: var(--gold); color: #fff;
+  border: none; padding: 12px 30px;
+  position: relative; overflow: hidden;
+  transition: box-shadow .35s;
+}
+.zs-btn-primary::after {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(255,255,255,.18);
+  transform: translateX(-101%);
+  transition: transform .38s cubic-bezier(.16,1,.3,1);
+}
+.zs-btn-primary:hover::after { transform: translateX(0); }
+.zs-btn-primary:hover { box-shadow: 0 0 44px rgba(204,0,0,.35); }
+
+/* ─────────────────────────────── HERO ─────────────────────────────── */
+.zs-hero {
+  position: relative; height: 100vh; min-height: 780px;
+  display: flex; align-items: center; overflow: hidden;
+}
+#zs-canvas { position: absolute; inset: 0; z-index: 0; }
+
+.zs-hero-veil {
+  position: absolute; inset: 0; z-index: 1;
+  background:
+    radial-gradient(ellipse 50% 70% at 72% 44%, rgba(204,0,0,.04) 0%, transparent 55%),
+    linear-gradient(105deg, rgba(255,255,255,.82) 38%, rgba(255,255,255,.05) 100%),
+    linear-gradient(to top, rgba(255,255,255,.95) 0%, transparent 22%);
+}
+
+.zs-hero-glyph {
+  position: absolute; right: -60px; top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 42vw; color: rgba(204,0,0,.018);
+  line-height: .85; pointer-events: none; user-select: none;
+  z-index: 1; letter-spacing: -20px;
+  animation: glyphFloat 12s ease-in-out infinite;
+}
+@keyframes glyphFloat {
+  0%,100% { transform: translateY(-50%) translateX(0); }
+  50%     { transform: translateY(-52%) translateX(-12px); }
+}
+
+.zs-hero-body { position: relative; z-index: 2; padding: 0 88px; }
+
+.zs-pre {
+  display: flex; align-items: center; gap: 20px;
+  margin-bottom: 52px;
+  opacity: 0; animation: slideUp .8s cubic-bezier(.16,1,.3,1) .2s forwards;
+}
+.zs-pre-bar { width: 36px; height: 1px; background: var(--gold); }
+.zs-pre-txt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .57rem; letter-spacing: 4.5px; text-transform: uppercase;
+  color: var(--gold);
+}
+.zs-pre-sep { color: var(--muted); font-size: .8rem; }
+
+.zs-h1 {
+  font-family: 'ST Tokyo', 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2.6rem, 5.2vw, 6rem);
+  line-height: 1.05; letter-spacing: -2px;
+  margin-bottom: 52px;
+  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .36s forwards;
+}
+.zs-h1 .s1 { display: block; color: var(--text); }
+.zs-h1 .s2 { display: block; color: var(--text); }
+.zs-h1 .s3 { display: block; color: var(--gold); }
+.zs-h1 .s4 { display: block; color: var(--text); font-size: .55em; letter-spacing: 0px; font-weight: 600; margin-top: 18px; line-height: 1.3; border-left: 3px solid var(--gold); padding-left: 18px; }
+
+.zs-hero-copy {
+  font-size: .98rem; font-weight: 400; line-height: 1.88;
+  color: #111; max-width: 360px; margin-bottom: 60px;
+  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .52s forwards;
+}
+.zs-hero-copy strong { color: #000; font-weight: 700; }
+
+.zs-hero-btns {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .68s forwards;
+}
+
+.zs-btn-a {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
+  background: var(--gold); color: #fff;
+  border: none; padding: 18px 52px;
+  position: relative; overflow: hidden;
+  transition: box-shadow .35s;
+}
+.zs-btn-a::after {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(255,255,255,.18);
+  transform: translateX(-101%);
+  transition: transform .38s cubic-bezier(.16,1,.3,1);
+}
+.zs-btn-a:hover::after { transform: translateX(0); }
+.zs-btn-a:hover { box-shadow: 0 0 52px rgba(204,0,0,.38); }
+
+.zs-btn-b {
+  font-family: 'Syne', sans-serif; font-weight: 600;
+  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
+  background: transparent; color: var(--text);
+  border: 1px solid rgba(0,0,0,.14);
+  padding: 18px 52px; transition: all .35s;
+}
+.zs-btn-b:hover { border-color: rgba(204,0,0,.38); color: var(--gold); }
+
+.zs-hero-aside {
+  position: absolute; right: 88px; bottom: 72px; z-index: 2;
+  display: flex; flex-direction: column; gap: 11px; align-items: flex-end;
+  opacity: 0; animation: fadeIn .9s ease 1.1s forwards;
+}
+.zs-aside-row {
+  display: flex; align-items: center; gap: 12px;
+}
+.zs-aside-k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase; color: #888;
+}
+.zs-aside-v {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase; color: #222;
+}
+
+.zs-scroll {
+  position: absolute; left: 88px; bottom: 72px; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  opacity: 0; animation: fadeIn .9s ease 1.2s forwards;
+}
+.zs-scroll-line {
+  width: 1px; height: 60px;
+  background: linear-gradient(to bottom, var(--gold), transparent);
+  animation: scrollPulse 2.2s ease infinite;
+}
+@keyframes scrollPulse {
+  0%   { transform: scaleY(0); transform-origin: top;    opacity: 1; }
+  49%  { transform: scaleY(1); transform-origin: top;    opacity: 1; }
+  50%  { transform: scaleY(1); transform-origin: bottom; opacity: 1; }
+  100% { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
+}
+.zs-scroll-lbl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase;
+  color: #333; writing-mode: vertical-rl; transform: rotate(180deg);
+}
+
+/* ─────────────────────────────── TICKER ─────────────────────────────── */
+.zs-ticker {
+  background: var(--gold); overflow: hidden;
+  padding: 13px 0; position: relative; z-index: 5;
+}
+.zs-ticker-track {
+  display: inline-flex; white-space: nowrap;
+  animation: tickRun 30s linear infinite;
+}
+.zs-ticker-track:hover { animation-play-state: paused; }
+@keyframes tickRun {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.zs-tick {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .66rem; letter-spacing: 5px; text-transform: uppercase;
+  color: #fff; padding: 0 36px;
+}
+.zs-tick-dot { color: rgba(255,255,255,.35); }
+
+/* ─────────────────────────────── SHARED ─────────────────────────────── */
+.zs-sect { padding: 160px 88px; }
+.zs-wrap { max-width: 1280px; margin: 0 auto; }
+
+.zs-eye {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
+}
+.zs-eye-n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .53rem; letter-spacing: 2.5px; color: #444;
+}
+.zs-eye-bar { width: 1px; height: 18px; background: #bbb; }
+.zs-eye-t {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .53rem; letter-spacing: 4px; text-transform: uppercase; color: #444;
+}
+.zs-eye-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--gold);
+}
+
+.zs-sh {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2.9rem, 5.5vw, 6.5rem);
+  line-height: .9; letter-spacing: -2.5px;
+}
+.zs-sh em { color: var(--gold); font-style: normal; }
+
+/* ── REVEAL ── */
+.rev {
+  opacity: 0; transform: translateY(36px);
+  transition: opacity .95s cubic-bezier(.16,1,.3,1),
+              transform .95s cubic-bezier(.16,1,.3,1);
+}
+.rev.vis { opacity: 1; transform: translateY(0); }
+.rev.d1 { transition-delay: .08s; }
+.rev.d2 { transition-delay: .2s; }
+.rev.d3 { transition-delay: .32s; }
+.rev.d4 { transition-delay: .44s; }
+.rev.d5 { transition-delay: .56s; }
+
+/* ─────────────────────────────── CAPABILITIES ─────────────────────────────── */
+.zs-cap { background: var(--ink); position: relative; }
+.zs-cap::after {
+  content: ''; position: absolute; bottom: 0; left: 88px; right: 88px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(204,0,0,.12), transparent);
+}
+
+.zs-cap-hd {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 110px; align-items: end; margin-bottom: 100px;
+}
+.zs-cap-aside p {
+  font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88; max-width: 420px;
+}
+.zs-cap-aside strong { color: #000; font-weight: 700; }
+.zs-cap-note {
+  display: flex; align-items: center; gap: 14px; margin-top: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .54rem; letter-spacing: 3px; text-transform: uppercase; color: var(--gold);
+}
+.zs-cap-note::before { content:''; width:14px; height:1px; background:var(--gold); }
+
+.zs-able { display: flex; flex-direction: column; gap: 2px; }
+
+.zs-row {
+  display: grid;
+  grid-template-columns: 52px 200px 1fr 52px;
+  align-items: center; gap: 72px;
+  padding: 52px 64px;
+  background: var(--void);
+  border: 1px solid transparent;
+  position: relative; overflow: hidden;
+  transition: background .4s, border-color .4s;
+}
+.zs-row::before {
+  content: ''; position: absolute;
+  left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--gold);
+  transform: scaleY(0); transform-origin: bottom;
+  transition: transform .5s cubic-bezier(.16,1,.3,1);
+}
+.zs-row-glow {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(204,0,0,.018) 0%, transparent 55%);
+  opacity: 0; transition: opacity .45s;
+  pointer-events: none;
+}
+.zs-row:hover { background: var(--surface); border-color: var(--edge-g); }
+.zs-row:hover::before { transform: scaleY(1); }
+.zs-row:hover .zs-row-glow { opacity: 1; }
+
+.zs-row-n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .53rem; letter-spacing: 2px; color: #777;
+}
+.zs-row-kw {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 3rem; text-transform: uppercase;
+  color: var(--text); transition: color .35s; line-height: 1;
+}
+.zs-row:hover .zs-row-kw { color: var(--gold); }
+
+.zs-row-name {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .9rem; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text); margin-bottom: 9px;
+}
+.zs-row-desc { font-size: .84rem; font-weight: 400; color: #333; line-height: 1.72; margin-bottom: 14px; }
+.zs-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.zs-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 1.5px; text-transform: uppercase;
+  color: #444; border: 1px solid #999; padding: 4px 10px;
+  transition: border-color .3s, color .3s;
+}
+.zs-row:hover .zs-tag { border-color: rgba(204,0,0,.2); color: rgba(204,0,0,.7); }
+.zs-row-arr {
+  color: #777; font-size: 1.1rem;
+  transition: color .3s, transform .35s cubic-bezier(.16,1,.3,1);
+}
+.zs-row:hover .zs-row-arr { color: var(--gold); transform: translateX(7px); }
+
+/* ─────────────────────────────── MICRO SAAS ─────────────────────────────── */
+.zs-saas { background: var(--surface); }
+
+.zs-saas-hd {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 110px; align-items: end; margin-bottom: 88px;
+}
+.zs-saas-note {
+  font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88;
+}
+.zs-saas-note strong { color: #000; font-weight: 700; }
+
+.zs-saas-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.zs-saas-card {
+  background: var(--void);
+  border: 1px solid var(--edge);
+  padding: 52px 44px;
+  position: relative; overflow: hidden;
+  transition: border-color .45s, transform .45s cubic-bezier(.16,1,.3,1);
+}
+.zs-saas-card:hover { border-color: var(--edge-g); transform: translateY(-7px); }
+.zs-saas-card::after {
+  content: ''; position: absolute;
+  bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold), rgba(204,0,0,.2));
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .55s cubic-bezier(.16,1,.3,1);
+}
+.zs-saas-card:hover::after { transform: scaleX(1); }
+.zs-saas-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(204,0,0,.03), transparent 60%);
+  opacity: 0; transition: opacity .45s;
+}
+.zs-saas-card:hover::before { opacity: 1; }
+
+.zs-saas-icon { font-size: 2.4rem; margin-bottom: 32px; display: block; }
+.zs-saas-name {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 1.08rem; margin-bottom: 14px; line-height: 1.25;
+}
+.zs-saas-desc {
+  font-size: .83rem; font-weight: 400; color: #333;
+  line-height: 1.78; margin-bottom: 30px;
+}
+.zs-saas-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--gold); background: var(--gold-lo);
+  border: 1px solid rgba(204,0,0,.14); padding: 5px 13px;
+}
+.zs-saas-badge::before {
+  content: ''; width: 4px; height: 4px; border-radius: 50%;
+  background: var(--gold);
+}
+
+/* ─────────────────────────────── WORK ─────────────────────────────── */
+.zs-work { background: var(--ink); }
+
+.zs-work-hd {
+  display: flex; justify-content: space-between;
+  align-items: flex-end; margin-bottom: 88px; gap: 80px;
+}
+.zs-work-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .57rem; letter-spacing: 2px; text-transform: uppercase;
+  color: #333; line-height: 1.9; text-align: right; max-width: 220px;
+}
+
+.zs-cases { display: flex; flex-direction: column; gap: 2px; }
+
+.zs-case {
+  display: grid; grid-template-columns: 1fr 260px;
+  gap: 80px; align-items: start;
+  background: var(--void); border: 1px solid transparent;
+  padding: 64px 72px;
+  position: relative; overflow: hidden;
+  transition: background .45s, border-color .45s;
+}
+.zs-case::after {
+  content: ''; position: absolute;
+  right: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--gold); transform: scaleY(0); transform-origin: top;
+  transition: transform .55s cubic-bezier(.16,1,.3,1);
+}
+.zs-case-shine {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 40% 60% at 90% 20%, rgba(204,0,0,.025), transparent 60%);
+  opacity: 0; transition: opacity .45s; pointer-events: none;
+}
+.zs-case:hover { background: var(--surface); border-color: var(--edge-g); }
+.zs-case:hover::after { transform: scaleY(1); }
+.zs-case:hover .zs-case-shine { opacity: 1; }
+
+.zs-case-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .52rem; letter-spacing: 2.5px; color: #555; margin-bottom: 16px;
+}
+.zs-case-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gold); background: var(--gold-lo);
+  border: 1px solid rgba(204,0,0,.15); padding: 5px 12px; margin-bottom: 40px;
+}
+.zs-case-chip::before {
+  content: ''; width: 4px; height: 4px; border-radius: 50%;
+  background: var(--gold); animation: livePulse 2s ease infinite;
+}
+.zs-case-n {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 7rem; line-height: 1;
+  color: rgba(204,0,0,.045);
+}
+
+.zs-case-title {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 1.28rem; line-height: 1.3; margin-bottom: 44px;
+}
+.zs-case-fields { display: flex; flex-direction: column; gap: 24px; }
+.zs-cf-l {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 8px;
+}
+.zs-cf-v { font-size: .83rem; font-weight: 400; color: #333; line-height: 1.65; }
+
+.zs-case-right { display: flex; flex-direction: column; gap: 28px; padding-top: 4px; }
+.zs-out {
+  border-left: 1px solid #aaa; padding-left: 24px;
+  transition: border-color .35s;
+}
+.zs-case:hover .zs-out { border-color: rgba(204,0,0,.25); }
+.zs-out-n {
+  display: block;
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 2.4rem; line-height: 1; color: var(--gold); margin-bottom: 6px;
+}
+.zs-out-l {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase; color: #444;
+}
+
+/* ─────────────────────────────── PROCESS ─────────────────────────────── */
+.zs-proc { background: var(--void); }
+
+.zs-proc-hd {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 110px; align-items: end; margin-bottom: 88px;
+}
+.zs-proc-hd > p { font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88; }
+
+.zs-phases { display: flex; flex-direction: column; }
+
+.zs-phase {
+  display: grid;
+  grid-template-columns: 88px 240px 1fr auto;
+  gap: 72px; align-items: center;
+  padding: 50px 0;
+  border-bottom: 1px solid var(--edge);
+  position: relative; overflow: hidden;
+  transition: padding-left .45s cubic-bezier(.16,1,.3,1);
+}
+.zs-phase:first-child { border-top: 1px solid var(--edge); }
+.zs-phase-bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(204,0,0,.015) 0%, transparent 50%);
+  opacity: 0; transition: opacity .45s; pointer-events: none;
+}
+.zs-phase:hover { padding-left: 30px; }
+.zs-phase:hover .zs-phase-bg { opacity: 1; }
+
+.zs-phase-n {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 5rem; color: #bbb; line-height: 1;
+  transition: color .35s;
+}
+.zs-phase:hover .zs-phase-n { color: rgba(204,0,0,.35); }
+.zs-phase-name {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; color: #000;
+}
+.zs-phase-desc { font-size: .83rem; font-weight: 400; color: #333; line-height: 1.75; }
+.zs-phase-dur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .52rem; letter-spacing: 2px; text-transform: uppercase;
+  color: #555; white-space: nowrap;
+}
+
+/* ─────────────────────────────── MANIFESTO ─────────────────────────────── */
+.zs-man {
+  background: var(--gold); position: relative; overflow: hidden;
+}
+.zs-man-glyph {
+  position: absolute; right: -5%; bottom: -10%;
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 46vw; line-height: 1; color: rgba(0,0,0,.04);
+  pointer-events: none; user-select: none; letter-spacing: -20px;
+}
+.zs-man-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1.15fr;
+  gap: 130px; align-items: start; position: relative; z-index: 1;
+}
+.zs-man-eye .zs-eye-n,
+.zs-man-eye .zs-eye-t { color: rgba(255,255,255,.55); }
+.zs-man-eye .zs-eye-bar { background: rgba(255,255,255,.3); }
+.zs-man-eye .zs-eye-dot { background: rgba(255,255,255,.6); }
+
+.zs-man-h {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(3.2rem, 5.8vw, 6.5rem);
+  line-height: .9; color: #fff; letter-spacing: -3px;
+  margin-top: 24px; margin-bottom: 32px;
+}
+.zs-man-sub {
+  font-size: .9rem; font-weight: 300; color: rgba(255,255,255,.55);
+  line-height: 1.85; max-width: 310px;
+}
+
+.zs-man-lines { display: flex; flex-direction: column; padding-top: 6px; }
+.zs-man-line {
+  padding: 36px 0; border-bottom: 1px solid rgba(255,255,255,.18);
+  transition: padding-left .4s cubic-bezier(.16,1,.3,1);
+}
+.zs-man-line:first-child { border-top: 1px solid rgba(255,255,255,.18); }
+.zs-man-line:hover { padding-left: 14px; }
+.zs-man-line p { font-size: .92rem; font-weight: 300; color: rgba(255,255,255,.55); line-height: 1.85; }
+.zs-man-line p strong { color: #fff; font-weight: 600; }
+
+/* ─────────────────────────────── CONTACT ─────────────────────────────── */
+.zs-contact { background: var(--ink); position: relative; overflow: hidden; }
+.zs-contact::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 55% 65% at 50% 100%, rgba(204,0,0,.045), transparent 55%);
+}
+.zs-contact-wrap { max-width: 1280px; margin: 0 auto; position: relative; z-index: 1; }
+.zs-contact-hd { margin-bottom: 88px; }
+.zs-contact-hd .zs-sh { margin-bottom: 24px; }
+.zs-contact-hd > p { font-size: .95rem; font-weight: 400; color: #222; line-height: 1.82; max-width: 520px; }
+.zs-contact-hd > p strong { color: #000; font-weight: 700; }
+
+.zs-cg {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 2px; margin-bottom: 2px;
+}
+
+.zs-cc {
+  background: var(--void);
+  border: 1px solid var(--edge);
+  padding: 52px 60px;
+  display: flex; flex-direction: column; gap: 14px;
+  position: relative; overflow: hidden;
+  text-decoration: none;
+  transition: border-color .45s;
+}
+.zs-cc::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(204,0,0,.4), transparent);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .55s cubic-bezier(.16,1,.3,1);
+}
+.zs-cc::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 60% at 50% 0%, rgba(204,0,0,.03), transparent 60%);
+  opacity: 0; transition: opacity .45s;
+}
+.zs-cc:hover { border-color: var(--edge-g); }
+.zs-cc:hover::before { transform: scaleX(1); }
+.zs-cc:hover::after { opacity: 1; }
+
+.zs-cc-type {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .52rem; letter-spacing: 4px; text-transform: uppercase; color: var(--gold);
+  position: relative; z-index: 1;
+}
+.zs-cc-icon { font-size: 2rem; position: relative; z-index: 1; }
+.zs-cc-val {
+  font-family: 'Syne', sans-serif; font-weight: 600;
+  font-size: 1.35rem; color: #000; line-height: 1.3;
+  position: relative; z-index: 1;
+}
+.zs-cc-sub {
+  font-size: .8rem; font-weight: 400; color: #444;
+  position: relative; z-index: 1;
+}
+
+.zs-contact-cta {
+  background: var(--gold); padding: 72px 88px;
+  display: flex; justify-content: space-between; align-items: center; gap: 80px;
+  position: relative; overflow: hidden;
+}
+.zs-contact-cta::before {
+  content: 'ZENSHA'; position: absolute;
+  right: -20px; top: 50%; transform: translateY(-50%);
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 18rem; color: rgba(0,0,0,.05);
+  line-height: 1; pointer-events: none; letter-spacing: -8px;
+}
+.zs-cta-h {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2rem, 3.8vw, 4rem);
+  color: #fff; line-height: 1.05; margin-bottom: 16px;
+  position: relative; z-index: 1;
+}
+.zs-cta-sub {
+  font-size: .88rem; font-weight: 300; color: rgba(255,255,255,.55);
+  line-height: 1.78; max-width: 400px; position: relative; z-index: 1;
+}
+
+.zs-btn-dark {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
+  background: #000; color: #fff;
+  border: none; padding: 20px 56px;
+  position: relative; overflow: hidden;
+  white-space: nowrap; z-index: 1;
+  transition: box-shadow .35s;
+}
+.zs-btn-dark::after {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(255,255,255,.08);
+  transform: translateX(-101%);
+  transition: transform .38s cubic-bezier(.16,1,.3,1);
+}
+.zs-btn-dark:hover::after { transform: translateX(0); }
+.zs-btn-dark:hover { box-shadow: 0 0 40px rgba(0,0,0,.2); }
+
+/* ─────────────────────────────── FOOTER ─────────────────────────────── */
+.zs-footer {
+  background: #0a0a0a; border-top: 1px solid rgba(255,255,255,.06);
+  padding: 100px 88px 60px;
+}
+.zs-footer-wrap { max-width: 1280px; margin: 0 auto; }
+
+.zs-foot-top {
+  display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr;
+  gap: 100px; margin-bottom: 80px;
+}
+.zs-foot-brand .zs-logo { display: block; margin-bottom: 22px; color: #fff; }
+.zs-foot-brand .zs-logo em { color: var(--gold); }
+.zs-foot-brand p { font-size: .84rem; font-weight: 400; color: rgba(255,255,255,.55); line-height: 1.8; max-width: 270px; }
+
+.zs-foot-col h5 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 4px; text-transform: uppercase;
+  color: rgba(255,255,255,.5); margin-bottom: 26px;
+}
+.zs-foot-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.zs-foot-col a {
+  font-size: .84rem; font-weight: 400; color: rgba(255,255,255,.45);
+  text-decoration: none; transition: color .3s;
+}
+.zs-foot-col a:hover { color: #fff; }
+
+.zs-foot-bot {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 36px; border-top: 1px solid rgba(255,255,255,.06);
+}
+.zs-foot-copy {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,.45);
+}
+.zs-foot-right { display: flex; align-items: center; gap: 2px; }
+.zs-foot-soc {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(255,255,255,.45); text-decoration: none;
+  border: 1px solid rgba(255,255,255,.25); padding: 10px 16px;
+  transition: color .3s, border-color .3s;
+}
+.zs-foot-soc:hover { color: var(--gold); border-color: var(--gold); }
+
+/* ── ANIMATIONS ── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(36px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─────────────────────────────── LOADER ─────────────────────────────── */
+#zs-loader {
+  position: fixed; inset: 0; z-index: 10000;
+  background: #000;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 32px;
+  transition: opacity .7s ease, visibility .7s ease;
+}
+#zs-loader.hide { opacity: 0; visibility: hidden; }
+
+.zs-loader-logo {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2.8rem, 8vw, 6rem);
+  letter-spacing: 14px; text-transform: uppercase;
+  color: #fff; overflow: hidden;
+}
+.zs-loader-logo em { color: #CC0000; font-style: normal; }
+.zs-loader-logo span {
+  display: inline-block;
+  animation: loaderLetterIn .7s cubic-bezier(.16,1,.3,1) forwards;
+  opacity: 0; transform: translateY(60px);
+}
+.zs-loader-logo span:nth-child(1)  { animation-delay: .05s; }
+.zs-loader-logo span:nth-child(2)  { animation-delay: .10s; }
+.zs-loader-logo span:nth-child(3)  { animation-delay: .15s; }
+.zs-loader-logo span:nth-child(4)  { animation-delay: .22s; }
+.zs-loader-logo span:nth-child(5)  { animation-delay: .28s; }
+.zs-loader-logo span:nth-child(6)  { animation-delay: .34s; }
+@keyframes loaderLetterIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.zs-loader-bar-wrap {
+  width: min(320px, 70vw); height: 1px;
+  background: rgba(255,255,255,.12); position: relative; overflow: hidden;
+}
+.zs-loader-bar-fill {
+  position: absolute; top: 0; left: 0; height: 100%;
+  background: #CC0000;
+  animation: loaderFill 1.8s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes loaderFill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.zs-loader-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .52rem; letter-spacing: 5px; text-transform: uppercase;
+  color: rgba(255,255,255,.3);
+  animation: fadeIn .6s ease .9s both;
+}
+
+/* ─────────────────────────────── MOBILE MENU ─────────────────────────────── */
+.zs-hamburger {
+  display: none;
+  flex-direction: column; gap: 5px;
+  background: none; border: none;
+  padding: 8px; z-index: 601;
+}
+.zs-hamburger span {
+  display: block; width: 24px; height: 1.5px;
+  background: var(--text);
+  transition: transform .4s cubic-bezier(.16,1,.3,1),
+              opacity .3s ease, background .3s;
+}
+.zs-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+.zs-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.zs-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+.zs-mobile-menu {
+  display: none;
+  position: fixed; inset: 0; z-index: 599;
+  background: rgba(255,255,255,.98);
+  backdrop-filter: blur(24px);
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 0;
+  opacity: 0; visibility: hidden;
+  transition: opacity .45s cubic-bezier(.16,1,.3,1), visibility .45s;
+}
+.zs-mobile-menu.open { opacity: 1; visibility: visible; }
+
+.zs-mob-link {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  letter-spacing: -1px; text-transform: uppercase;
+  color: #000; text-decoration: none;
+  padding: 18px 0; border-bottom: 1px solid rgba(0,0,0,.07);
+  width: min(400px, 80vw); text-align: center;
+  opacity: 0; transform: translateY(20px);
+  transition: color .25s, opacity .5s cubic-bezier(.16,1,.3,1), transform .5s cubic-bezier(.16,1,.3,1);
+}
+.zs-mobile-menu.open .zs-mob-link { opacity: 1; transform: translateY(0); }
+.zs-mobile-menu.open .zs-mob-link:nth-child(1) { transition-delay: .08s; }
+.zs-mobile-menu.open .zs-mob-link:nth-child(2) { transition-delay: .14s; }
+.zs-mobile-menu.open .zs-mob-link:nth-child(3) { transition-delay: .20s; }
+.zs-mobile-menu.open .zs-mob-link:nth-child(4) { transition-delay: .26s; }
+.zs-mobile-menu.open .zs-mob-link:nth-child(5) { transition-delay: .32s; }
+.zs-mob-link:hover { color: var(--gold); }
+.zs-mob-link:last-child { border-bottom: none; }
+
+.zs-mob-cta {
+  margin-top: 40px;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .75rem; letter-spacing: 4px; text-transform: uppercase;
+  background: var(--gold); color: #fff;
+  border: none; padding: 18px 52px;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity .5s cubic-bezier(.16,1,.3,1) .4s,
+              transform .5s cubic-bezier(.16,1,.3,1) .4s, box-shadow .3s;
+}
+.zs-mobile-menu.open .zs-mob-cta { opacity: 1; transform: translateY(0); }
+.zs-mob-cta:hover { box-shadow: 0 0 44px rgba(204,0,0,.4); }
+
+/* ─────────────────────────────── ENHANCED CARD HOVERS ─────────────────────────────── */
+.zs-saas-card {
+  background: var(--void);
+  border: 1px solid var(--edge);
+  padding: 52px 44px;
+  position: relative; overflow: hidden;
+  transition: border-color .45s, transform .45s cubic-bezier(.16,1,.3,1), box-shadow .45s;
+}
+.zs-saas-card:hover {
+  border-color: var(--edge-g);
+  transform: translateY(-10px);
+  box-shadow: 0 28px 60px rgba(204,0,0,.09), 0 8px 20px rgba(0,0,0,.06);
+}
+.zs-saas-card .zs-saas-icon { transition: transform .5s cubic-bezier(.16,1,.3,1); }
+.zs-saas-card:hover .zs-saas-icon { transform: scale(1.2) rotate(-6deg); }
+
+.zs-case {
+  display: grid; grid-template-columns: 1fr 260px;
+  gap: 80px; align-items: start;
+  background: var(--void); border: 1px solid transparent;
+  padding: 64px 72px;
+  position: relative; overflow: hidden;
+  transition: background .45s, border-color .45s,
+              transform .45s cubic-bezier(.16,1,.3,1), box-shadow .45s;
+}
+.zs-case:hover {
+  background: var(--surface); border-color: var(--edge-g);
+  transform: translateX(6px);
+  box-shadow: -6px 0 0 0 var(--gold), 0 12px 40px rgba(0,0,0,.06);
+}
+
+/* ─────────────────────────────── CONTACT FORM ─────────────────────────────── */
+.zs-form-wrap {
+  margin-top: 88px;
+  background: var(--void);
+  border: 1px solid var(--edge);
+  padding: 72px 80px;
+  position: relative; overflow: hidden;
+}
+.zs-form-wrap::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold), rgba(204,0,0,.15));
+}
+.zs-form-title {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 1.5rem; letter-spacing: -0.5px;
+  margin-bottom: 8px; color: #000;
+}
+.zs-form-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .52rem; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 52px;
+}
+.zs-form-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 20px; margin-bottom: 20px;
+}
+.zs-field { display: flex; flex-direction: column; gap: 8px; }
+.zs-field.full { grid-column: 1 / -1; }
+.zs-field label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase; color: #444;
+}
+.zs-field input, .zs-field select, .zs-field textarea {
+  background: var(--ink);
+  border: 1px solid var(--edge);
+  padding: 16px 20px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: .9rem; color: #000;
+  outline: none;
+  transition: border-color .3s, background .3s;
+  appearance: none; -webkit-appearance: none;
+}
+.zs-field input::placeholder, .zs-field textarea::placeholder { color: #aaa; }
+.zs-field input:focus, .zs-field select:focus, .zs-field textarea:focus {
+  border-color: var(--gold); background: #fff;
+}
+.zs-field textarea { min-height: 130px; resize: vertical; }
+.zs-field select { cursor: pointer; background-image: none; }
+
+.zs-form-actions {
+  display: flex; align-items: center; gap: 24px; margin-top: 8px; flex-wrap: wrap;
+}
+.zs-btn-submit {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
+  background: var(--gold); color: #fff;
+  border: none; padding: 20px 56px;
+  position: relative; overflow: hidden;
+  transition: box-shadow .35s;
+}
+.zs-btn-submit::after {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(255,255,255,.18);
+  transform: translateX(-101%);
+  transition: transform .38s cubic-bezier(.16,1,.3,1);
+}
+.zs-btn-submit:hover::after { transform: translateX(0); }
+.zs-btn-submit:hover { box-shadow: 0 0 52px rgba(204,0,0,.4); }
+.zs-btn-submit:disabled { opacity: .6; }
+
+.zs-form-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2px; color: #888;
+}
+.zs-form-success {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 18px; padding: 60px 0; text-align: center;
+}
+.zs-form-success-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  animation: successPop .6s cubic-bezier(.16,1,.3,1) forwards;
+}
+@keyframes successPop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.zs-form-success h3 {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 1.6rem; color: #000; letter-spacing: -0.5px;
+}
+.zs-form-success p { font-size: .88rem; color: #444; max-width: 320px; line-height: 1.7; }
+
+/* ─────────────────────────────── RESPONSIVE ─────────────────────────────── */
+@media (max-width: 1100px) {
+  .zs-nav, .zs-nav.stuck { padding: 18px 28px; }
+  .zs-nav-links { display: none; }
+  .zs-hamburger { display: flex; }
+  .zs-mobile-menu { display: flex; }
+  .zs-live { display: none; }
+  .zs-sect { padding: 100px 28px; }
+  .zs-hero-body { padding: 0 28px; }
+  .zs-hero-aside,.zs-scroll { display: none; }
+  .zs-cap-hd,.zs-saas-hd,.zs-proc-hd { grid-template-columns: 1fr; gap: 48px; }
+  .zs-row { grid-template-columns: 48px 1fr; padding: 38px 28px; gap: 24px; }
+  .zs-row-arr { display: none; }
+  .zs-saas-grid { grid-template-columns: 1fr; }
+  .zs-work-hd { flex-direction: column; align-items: flex-start; }
+  .zs-work-note { text-align: left; }
+  .zs-case { grid-template-columns: 1fr; padding: 48px 28px; gap: 40px; }
+  .zs-case-n { display: none; }
+  .zs-phase { grid-template-columns: 70px 1fr; gap: 28px; }
+  .zs-phase-dur { display: none; }
+  .zs-man-inner { grid-template-columns: 1fr; gap: 60px; }
+  .zs-cg { grid-template-columns: 1fr; }
+  .zs-contact-cta { flex-direction: column; align-items: flex-start; gap: 40px; padding: 52px 40px; }
+  .zs-foot-top { grid-template-columns: 1fr 1fr; gap: 56px; }
+  .zs-footer { padding: 72px 28px 52px; }
+  .zs-form-wrap { padding: 48px 28px; }
+  .zs-form-grid { grid-template-columns: 1fr; }
+  .zs-field.full { grid-column: 1; }
+}
+@media (max-width: 640px) {
+  .zs-h1 { font-size: clamp(3.2rem,16vw,5rem); letter-spacing: -2.5px; }
+  .zs-sh { letter-spacing: -1.5px; }
+  .zs-row { grid-template-columns: 1fr; }
+  .zs-row-n,.zs-row-arr { display: none; }
+  .zs-foot-top { grid-template-columns: 1fr; }
+  .zs-foot-bot { flex-direction: column; gap: 24px; }
+  .zs-cc { padding: 40px 28px; }
+}
+
+/* ─────────────────────────────── PRICING ─────────────────────────────── */
+.zs-pricing { background: var(--void); }
+
+.zs-pricing-hd {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 110px; align-items: end; margin-bottom: 88px;
+}
+.zs-pricing-note { font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88; }
+.zs-pricing-note strong { color: #000; font-weight: 700; }
+
+.zs-pricing-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; align-items: start;
+}
+
+.zs-price-card {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  padding: 52px 44px 48px;
+  position: relative; overflow: hidden;
+  transition: border-color .45s, transform .45s cubic-bezier(.16,1,.3,1), box-shadow .45s;
+}
+.zs-price-card:hover {
+  border-color: var(--edge-g);
+  transform: translateY(-9px);
+  box-shadow: 0 28px 64px rgba(204,0,0,.07);
+}
+.zs-price-card::after {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold), rgba(204,0,0,.2));
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .55s cubic-bezier(.16,1,.3,1);
+}
+.zs-price-card:hover::after { transform: scaleX(1); }
+.zs-price-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 65% 45% at 50% 0%, rgba(204,0,0,.032), transparent 60%);
+  opacity: 0; transition: opacity .45s;
+}
+.zs-price-card:hover::before { opacity: 1; }
+
+.zs-price-card.featured {
+  background: var(--void);
+  border-color: rgba(204,0,0,.22);
+  padding-top: 44px;
+}
+.zs-price-card.featured::after { transform: scaleX(1); }
+
+.zs-price-featured-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .48rem; letter-spacing: 3px; text-transform: uppercase;
+  color: #fff; background: var(--gold);
+  padding: 5px 14px; margin-bottom: 36px;
+}
+.zs-price-featured-tag::before {
+  content: ''; width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(255,255,255,.7);
+  animation: livePulse 2s ease infinite;
+}
+
+.zs-price-tier {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .52rem; letter-spacing: 3.5px; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 18px;
+}
+
+.zs-price-amount {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2.6rem, 4vw, 3.6rem);
+  line-height: 1; letter-spacing: -2px;
+  color: var(--text); margin-bottom: 6px;
+}
+.zs-price-amount sup {
+  font-size: .42em; letter-spacing: 0;
+  vertical-align: super; font-weight: 700; color: var(--gold);
+}
+
+.zs-price-name {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: 1.05rem; letter-spacing: .5px;
+  color: var(--text); margin-bottom: 8px; margin-top: 22px;
+  text-transform: uppercase;
+}
+
+.zs-price-desc {
+  font-size: .83rem; font-weight: 400; color: #444;
+  line-height: 1.75; margin-bottom: 34px;
+  border-bottom: 1px solid var(--edge); padding-bottom: 28px;
+}
+
+.zs-price-features { display: flex; flex-direction: column; gap: 13px; margin-bottom: 44px; }
+.zs-price-feat {
+  display: flex; align-items: flex-start; gap: 14px;
+  font-size: .82rem; font-weight: 400; color: #222; line-height: 1.55;
+}
+.zs-price-feat strong { font-weight: 700; color: #000; }
+.zs-price-feat-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--gold); flex-shrink: 0; margin-top: 7px;
+}
+
+.zs-price-slots {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .5rem; letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--gold); font-weight: 700;
+  background: var(--gold-lo); border: 1px solid rgba(204,0,0,.13);
+  padding: 8px 14px; margin-top: 20px;
+}
+.zs-price-slots::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--gold); flex-shrink: 0;
+  animation: livePulse 2.5s ease infinite;
+}
+
+.zs-price-btn {
+  width: 100%;
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: .68rem; letter-spacing: 3.5px; text-transform: uppercase;
+  padding: 16px 28px; border: none;
+  position: relative; overflow: hidden;
+  transition: box-shadow .35s;
+}
+.zs-price-btn.solid { background: var(--gold); color: #fff; }
+.zs-price-btn.solid::after {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(255,255,255,.18);
+  transform: translateX(-101%);
+  transition: transform .38s cubic-bezier(.16,1,.3,1);
+}
+.zs-price-btn.solid:hover::after { transform: translateX(0); }
+.zs-price-btn.solid:hover { box-shadow: 0 0 52px rgba(204,0,0,.38); }
+.zs-price-btn.outline { background: transparent; color: var(--text); border: 1px solid rgba(0,0,0,.14); }
+.zs-price-btn.outline:hover { border-color: rgba(204,0,0,.38); color: var(--gold); }
+
+@media (max-width: 900px) {
+  .zs-pricing-grid { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+  .zs-pricing-hd { grid-template-columns: 1fr; gap: 32px; }
+}
+
+/* ─────────────────────────────── HERO URGENCY ─────────────────────────────── */
+.zs-hero-urgency {
+  display: flex; align-items: center; gap: 12px; margin-top: 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .54rem; letter-spacing: 2px; color: #222;
+  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .82s forwards;
+}
+.zs-hero-urgency strong { color: var(--gold); }
+.zs-hero-urgency-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gold); flex-shrink: 0;
+  animation: livePulse 2s ease infinite;
+}
+
+/* ─────────────────────────────── AUTOPILOT CTA ─────────────────────────────── */
+.zs-autopilot-cta {
+  margin-top: 88px;
+  background: var(--text);
+  padding: 80px 88px;
+  position: relative; overflow: hidden;
+}
+.zs-autopilot-cta::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 55% 70% at 10% 50%, rgba(204,0,0,.18), transparent 60%);
+  pointer-events: none;
+}
+.zs-autopilot-inner { position: relative; z-index: 1; max-width: 680px; }
+.zs-autopilot-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .52rem; letter-spacing: 4px; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 22px;
+  display: flex; align-items: center; gap: 12px;
+}
+.zs-autopilot-label::before { content: ''; width: 20px; height: 1px; background: var(--gold); }
+.zs-autopilot-h {
+  font-family: 'ST Tokyo', 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2.2rem, 4.5vw, 4.5rem);
+  line-height: 1.0; letter-spacing: -2px;
+  color: #fff; margin-bottom: 24px;
+}
+.zs-autopilot-h em { color: var(--gold); font-style: normal; }
+.zs-autopilot-sub {
+  font-size: .92rem; font-weight: 400; color: rgba(255,255,255,.68);
+  line-height: 1.85; max-width: 520px; margin-bottom: 8px;
+}
+@media (max-width: 768px) {
+  .zs-autopilot-cta { padding: 60px 28px; }
+}
+  </style>
+</head>
+<body>
+
+  <!-- LOADER -->
+  <div id="zs-loader">
+    <div class="zs-loader-logo">
+      <span>Z</span><span>E</span><span>N</span><em><span>S</span><span>H</span><span>A</span></em>
+    </div>
+    <div class="zs-loader-bar-wrap">
+      <div class="zs-loader-bar-fill"></div>
+    </div>
+    <div class="zs-loader-tag">Digital Systems Studio · Est. 2026</div>
+  </div>
+
+  <!-- CURSOR -->
+  <div id="zs-cur-dot"></div>
+  <div id="zs-cur-ring"></div>
+
+  <!-- ATMOSPHERE -->
+  <div id="zs-grain"></div>
+  <div id="zs-scan"></div>
+  <div id="zs-bar"></div>
+
+  <!-- MOBILE MENU -->
+  <div class="zs-mobile-menu" id="zs-mobile-menu">
+    <a class="zs-mob-link" href="#capabilities" onclick="scrollToId('capabilities');return false;">Capabilities</a>
+    <a class="zs-mob-link" href="#products"     onclick="scrollToId('products');return false;">Products</a>
+    <a class="zs-mob-link" href="#work"         onclick="scrollToId('work');return false;">Work</a>
+    <a class="zs-mob-link" href="#process"      onclick="scrollToId('process');return false;">Process</a>
+    <a class="zs-mob-link" href="#contact"      onclick="scrollToId('contact');return false;">Contact</a>
+    <button class="zs-mob-cta" onclick="scrollToId('contact')">Start a Project →</button>
+  </div>
+
+  <!-- NAV -->
+  <nav class="zs-nav" id="zs-nav">
+    <a class="zs-logo" href="#" onclick="scrollToId('hero');return false;">ZEN<em>SHA</em></a>
+    <div class="zs-nav-links">
+      <a href="#capabilities" onclick="scrollToId('capabilities');return false;">Capabilities</a>
+      <a href="#products"     onclick="scrollToId('products');return false;">Products</a>
+      <a href="#work"         onclick="scrollToId('work');return false;">Work</a>
+      <a href="#process"      onclick="scrollToId('process');return false;">Process</a>
+      <a href="#contact"      onclick="scrollToId('contact');return false;">Contact</a>
+    </div>
+    <div class="zs-nav-right">
+      <div class="zs-live">
+        <div class="zs-live-dot"></div>
+        ACCEPTING BRIEFS
+      </div>
+      <button class="zs-btn-primary" onclick="scrollToId('contact')">Start</button>
+      <button class="zs-hamburger" id="zs-hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="zs-hero" id="hero">
+    <canvas id="zs-canvas"></canvas>
+    <div class="zs-hero-veil"></div>
+    <div class="zs-hero-glyph">Z</div>
+
+    <div class="zs-hero-body">
+      <div class="zs-pre">
+        <div class="zs-pre-bar"></div>
+        <span class="zs-pre-txt">Digital Systems Studio</span>
+        <span class="zs-pre-sep">·</span>
+        <span class="zs-pre-txt">Est. 2026</span>
+      </div>
+
+      <h1 class="zs-h1">
+        <span class="s1">Get a High-Converting</span>
+        <span class="s2">AI-Powered System</span>
+        <span class="s3"><span style="color:var(--text)">That Brings Clients —</span><br>Delivered in 7 Days.</span>
+        <span class="s4">We build AI systems + premium sites that get you leads.</span>
+      </h1>
+
+      <p class="zs-hero-copy">
+        Websites, automation, and AI — built to <strong>grow your business on autopilot.</strong>
+      </p>
+
+      <div class="zs-hero-btns">
+        <button class="zs-btn-a" onclick="scrollToId('pricing')" style="padding:20px 60px;font-size:.75rem;letter-spacing:4px;">Start Your AI System →</button>
+        <button class="zs-btn-b" onclick="scrollToId('work')">See the Work</button>
+      </div>
+      <div class="zs-hero-urgency">
+        <span class="zs-hero-urgency-dot"></span>
+        <strong>We only take 5 projects per week.</strong> &nbsp;Limited slots available — claim yours now.
+      </div>
+    </div>
+
+    <div class="zs-hero-aside">
+      <div class="zs-aside-row"><span class="zs-aside-k">STUDIO</span><span class="zs-aside-v">ZENSHA</span></div>
+      <div class="zs-aside-row"><span class="zs-aside-k">LOCATION</span><span class="zs-aside-v">Global · Remote</span></div>
+      <div class="zs-aside-row"><span class="zs-aside-k">STATUS</span><span class="zs-aside-v">Operational</span></div>
+      <div class="zs-aside-row"><span class="zs-aside-k">SLOTS</span><span class="zs-aside-v">5 / Week</span></div>
+    </div>
+
+    <div class="zs-scroll" onclick="scrollToId('capabilities')" style="cursor:pointer;">
+      <div class="zs-scroll-line"></div>
+      <span class="zs-scroll-lbl">SCROLL</span>
+    </div>
+  </section>
+
+  <!-- TICKER -->
+  <div class="zs-ticker">
+    <div class="zs-ticker-track" id="zs-ticker-track"></div>
+  </div>
+
+  <!-- CAPABILITIES -->
+  <section class="zs-sect zs-cap" id="capabilities">
+    <div class="zs-wrap">
+      <div class="zs-cap-hd">
+        <div class="rev">
+          <div class="zs-eye">
+            <span class="zs-eye-n">01</span>
+            <div class="zs-eye-bar"></div>
+            <span class="zs-eye-t">Capabilities</span>
+            <div class="zs-eye-dot"></div>
+          </div>
+          <h2 class="zs-sh">Four Disciplines.<br><em>One System.</em></h2>
+        </div>
+        <div class="rev d1">
+          <div class="zs-cap-aside">
+            <p>We don't offer isolated services. We deploy interconnected systems — build, automate, amplify, and ship — where <strong>each layer multiplies the one above it.</strong></p>
+            <div class="zs-cap-note">Infrastructure, not sprints.</div>
+          </div>
+        </div>
+      </div>
+      <div class="zs-able" id="zs-able"></div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="zs-sect zs-pricing" id="pricing">
+    <div class="zs-wrap">
+      <div class="zs-pricing-hd">
+        <div class="rev">
+          <div class="zs-eye">
+            <span class="zs-eye-n">02</span>
+            <div class="zs-eye-bar"></div>
+            <span class="zs-eye-t">Pricing</span>
+            <div class="zs-eye-dot"></div>
+          </div>
+          <h2 class="zs-sh">Simple Pricing.<br><em>Zero Guesswork.</em></h2>
+        </div>
+        <div class="rev d1">
+          <p class="zs-pricing-note">
+            Fixed-scope, fixed-price. You know exactly what you're getting before we write a single line.
+            <strong> No retainers. No hidden fees. No surprises.</strong><br><br>
+            <span style="color:var(--gold);font-weight:700;">⚡ We only take 5 projects per week — slots fill fast.</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="zs-pricing-grid">
+        <!-- BASIC -->
+        <div class="zs-price-card rev d1">
+          <div class="zs-price-tier">Starter</div>
+          <div class="zs-price-amount"><sup>₹</sup><strong>9,999</strong></div>
+          <div class="zs-price-name">Basic Website</div>
+          <div class="zs-price-desc">A fast, conversion-focused website built to make your brand look serious from day one.</div>
+          <div class="zs-price-features">
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Up to 5 pages</strong> — Home, About, Services, Contact + 1 custom</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Mobile-first</strong> responsive design</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>SEO foundations</strong> baked in from the start</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Contact form</strong> &amp; WhatsApp integration</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Delivered in 7 days</strong> — guaranteed</span></div>
+          </div>
+          <button class="zs-price-btn outline" onclick="scrollToId('contact')">Start Your AI System →</button>
+          <div class="zs-price-slots"><strong>⚡ Only 5 slots per week</strong></div>
+        </div>
+
+        <!-- GROWTH (FEATURED) -->
+        <div class="zs-price-card featured rev d2">
+          <div class="zs-price-featured-tag">Most Popular</div>
+          <div class="zs-price-tier">Growth</div>
+          <div class="zs-price-amount"><sup>₹</sup><strong>29,999</strong></div>
+          <div class="zs-price-name">AI Bot + Website</div>
+          <div class="zs-price-desc">Your website plus a fully trained AI chatbot that handles leads, answers questions, and books calls — on autopilot.</div>
+          <div class="zs-price-features">
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Everything in Basic</strong>, plus:</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Custom AI chatbot</strong> trained on your brand &amp; services</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Lead capture</strong> &amp; qualification built into the bot</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>WhatsApp / email handoff</strong> on hot leads</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>30-day post-launch</strong> support included</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Works 24/7</strong> — no team required</span></div>
+          </div>
+          <button class="zs-price-btn solid" onclick="scrollToId('contact')">Start Your AI System →</button>
+          <div class="zs-price-slots"><strong>⚡ Only 5 slots per week</strong></div>
+        </div>
+
+        <!-- ENTERPRISE -->
+        <div class="zs-price-card rev d3">
+          <div class="zs-price-tier">Enterprise</div>
+          <div class="zs-price-amount"><sup>₹</sup><strong>49,999</strong></div>
+          <div class="zs-price-name">Full Automation</div>
+          <div class="zs-price-desc">The complete growth OS — website, AI, and end-to-end automation so your business runs and scales without you in the loop.</div>
+          <div class="zs-price-features">
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Everything in Growth</strong>, plus:</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Full workflow automation</strong> — CRM, email, follow-ups</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>AI-powered email sequences</strong> for nurture &amp; close</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Social media scheduling</strong> system deployed</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Analytics dashboard</strong> — one view, every metric</span></div>
+            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>60-day support</strong> &amp; optimization cycle</span></div>
+          </div>
+          <button class="zs-price-btn outline" onclick="scrollToId('contact')">Start Your AI System →</button>
+          <div class="zs-price-slots"><strong>⚡ Only 5 slots per week</strong></div>
+        </div>
+      </div>
+
+      <!-- AUTOPILOT CTA -->
+      <div class="zs-autopilot-cta rev d4">
+        <div class="zs-autopilot-inner">
+          <div class="zs-autopilot-label">The Outcome</div>
+          <div class="zs-autopilot-h">Get clients on autopilot.<br><em>Starting this week.</em></div>
+          <div class="zs-autopilot-sub">Your website works while you sleep. Your AI bot qualifies leads 24/7. Your business grows — without you in the loop.</div>
+          <button class="zs-btn-a" onclick="scrollToId('contact')" style="padding:20px 60px;font-size:.72rem;letter-spacing:4px;margin-top:12px;">Start Your AI System →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MICRO SAAS -->
+  <section class="zs-sect zs-saas" id="products">
+    <div class="zs-wrap">
+      <div class="zs-saas-hd">
+        <div class="rev">
+          <div class="zs-eye">
+            <span class="zs-eye-n">02</span>
+            <div class="zs-eye-bar"></div>
+            <span class="zs-eye-t">Micro SaaS Products</span>
+            <div class="zs-eye-dot"></div>
+          </div>
+          <h2 class="zs-sh">Products We<br><em>Build &amp; Ship.</em></h2>
+        </div>
+        <div class="rev d1">
+          <p class="zs-saas-note">
+            Alongside client work, we design and launch our own focused software
+            products. <strong>Small surface area. Sharp solution. Built to sell.</strong>
+            AI-powered and automation-native from day one.
+          </p>
+        </div>
+      </div>
+      <div class="zs-saas-grid" id="zs-saas-grid"></div>
+      <div class="rev d4" style="margin-top:64px;display:flex;justify-content:center;">
+        <button class="zs-btn-a" onclick="scrollToId('contact')">Get Your AI System</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORK -->
+  <section class="zs-sect zs-work" id="work">
+    <div class="zs-wrap">
+      <div class="zs-work-hd rev">
+        <div>
+          <div class="zs-eye">
+            <span class="zs-eye-n">03</span>
+            <div class="zs-eye-bar"></div>
+            <span class="zs-eye-t">The Work</span>
+            <div class="zs-eye-dot"></div>
+          </div>
+          <h2 class="zs-sh">Evidence,<br><em>Not Claims.</em></h2>
+        </div>
+        <div class="zs-work-note">
+          Concept builds &amp; internal systems.<br>
+          Methodology is real.<br>
+          Quality speaks.
+        </div>
+      </div>
+      <div class="zs-cases" id="zs-cases"></div>
+    </div>
+  </section>
+
+  <!-- PROCESS -->
+  <section class="zs-sect zs-proc" id="process">
+    <div class="zs-wrap">
+      <div class="zs-proc-hd rev">
+        <div>
+          <div class="zs-eye">
+            <span class="zs-eye-n">04</span>
+            <div class="zs-eye-bar"></div>
+            <span class="zs-eye-t">Process</span>
+            <div class="zs-eye-dot"></div>
+          </div>
+          <h2 class="zs-sh">No Guesswork.<br><em>No Surprises.</em></h2>
+        </div>
+        <p>Every Zensha engagement runs the same tight protocol. Clear milestones, daily accountability. You always know exactly where your project stands — and why.</p>
+      </div>
+      <div class="zs-phases" id="zs-phases"></div>
+    </div>
+  </section>
+
+  <!-- MANIFESTO -->
+  <section class="zs-sect zs-man" id="studio">
+    <div class="zs-man-glyph">Z</div>
+    <div class="zs-man-inner">
+      <div class="rev">
+        <div class="zs-eye zs-man-eye">
+          <span class="zs-eye-n">05</span>
+          <div class="zs-eye-bar"></div>
+          <span class="zs-eye-t">The Studio</span>
+          <div class="zs-eye-dot"></div>
+        </div>
+        <h2 class="zs-man-h">Built<br>Different.<br>On Purpose.</h2>
+        <p class="zs-man-sub">
+          A small, focused operation building high-performance digital
+          systems for serious people. No noise. No fluff. Just execution.
+        </p>
+      </div>
+      <div class="zs-man-lines rev d2" id="zs-manifesto"></div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section class="zs-sect zs-contact" id="contact">
+    <div class="zs-contact-wrap">
+      <div class="zs-contact-hd rev">
+        <div class="zs-eye">
+          <span class="zs-eye-n">06</span>
+          <div class="zs-eye-bar"></div>
+          <span class="zs-eye-t">Contact</span>
+          <div class="zs-eye-dot"></div>
+        </div>
+        <h2 class="zs-sh">If You Know,<br><em>You Already Know.</em></h2>
+        <p>The right founders don't shop around. <strong>If you're here, you're probably ready.</strong> Let's find out in one focused call — no pitch decks, no wasted time.</p>
+      </div>
+
+      <div class="zs-cg">
+        <a href="mailto:zenshamedia@gmail.com" class="zs-cc rev d1">
+          <div class="zs-cc-type">Email</div>
+          <div class="zs-cc-icon">✉️</div>
+          <div class="zs-cc-val" style="font-size:1.15rem;">zenshamedia@gmail.com</div>
+          <div class="zs-cc-sub">Project briefs, partnerships &amp; general inquiries</div>
+        </a>
+        <a href="https://instagram.com/the_zensha" target="_blank" rel="noopener noreferrer" class="zs-cc rev d2">
+          <div class="zs-cc-type">Instagram</div>
+          <div class="zs-cc-icon">📸</div>
+          <div class="zs-cc-val">@the_zensha</div>
+          <div class="zs-cc-sub">Follow our builds, work, and behind-the-scenes</div>
+        </a>
+        <a href="https://wa.me/919930563799" target="_blank" rel="noopener noreferrer" class="zs-cc rev d1">
+          <div class="zs-cc-type">Phone · WhatsApp</div>
+          <div class="zs-cc-icon">📱</div>
+          <div class="zs-cc-val">+91 99305 63799</div>
+          <div class="zs-cc-sub">Direct line — WhatsApp preferred for first contact</div>
+        </a>
+        <a href="https://wa.me/8660250803" target="_blank" rel="noopener noreferrer" class="zs-cc rev d2">
+          <div class="zs-cc-type">Alternative Line</div>
+          <div class="zs-cc-icon">📞</div>
+          <div class="zs-cc-val">866 025 0803</div>
+          <div class="zs-cc-sub">Secondary line for international inquiries</div>
+        </a>
+      </div>
+
+      <div class="rev d3" style="display:flex;flex-direction:column;align-items:center;gap:14px;margin:48px 0;">
+        <button class="zs-btn-a" onclick="scrollToId('pricing')" style="padding:22px 72px;font-size:.78rem;letter-spacing:4px;">Start Your AI System →</button>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.5rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);font-weight:700;">⚡ Only 5 projects per week — act now</span>
+      </div>
+
+      <!-- BRIEF FORM -->
+      <div class="zs-form-wrap rev d3" id="zs-form-wrap">
+        <div class="zs-form-title">Submit Your Brief</div>
+        <div class="zs-form-sub">Tell us about your project — we'll take it from here</div>
+        <form id="zs-form" onsubmit="handleForm(event)">
+          <div class="zs-form-grid">
+            <div class="zs-field">
+              <label>Your Name *</label>
+              <input type="text" required placeholder="John Smith" id="f-name" />
+            </div>
+            <div class="zs-field">
+              <label>Email Address *</label>
+              <input type="email" required placeholder="john@company.com" id="f-email" />
+            </div>
+            <div class="zs-field">
+              <label>Service Needed</label>
+              <select id="f-service">
+                <option value="">Select a service…</option>
+                <option>Web Development</option>
+                <option>App Development</option>
+                <option>AI Agents / Chatbots</option>
+                <option>Marketing Infrastructure</option>
+                <option>Micro SaaS Build</option>
+                <option>Full System Deployment</option>
+              </select>
+            </div>
+            <div class="zs-field">
+              <label>Budget Range</label>
+              <select id="f-budget">
+                <option value="">Select a range…</option>
+                <option>Under $5K</option>
+                <option>$5K – $15K</option>
+                <option>$15K – $50K</option>
+                <option>$50K+</option>
+                <option>Let's discuss</option>
+              </select>
+            </div>
+            <div class="zs-field full">
+              <label>Project Brief *</label>
+              <textarea required placeholder="Tell us what you're building, the problem you're solving, your timeline, and what success looks like for you…" id="f-message"></textarea>
+            </div>
+          </div>
+          <div class="zs-form-actions">
+            <button class="zs-btn-submit" type="submit" id="f-submit">Send Brief →</button>
+            <span class="zs-form-note">We respond within 24 hours · No spam, ever</span>
+          </div>
+        </form>
+      </div>
+
+      <div class="zs-contact-cta rev d4">
+        <div class="zs-cta-l">
+          <div class="zs-cta-h">Get Clients on Autopilot — <em>Starting This Week.</em></div>
+          <div class="zs-cta-sub">We only take 5 projects per week. One 30-minute call is all it takes — no pitch decks, no wasted time.</div>
+        </div>
+        <button class="zs-btn-dark" onclick="scrollToId('pricing')">Start Your AI System →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="zs-footer">
+    <div class="zs-footer-wrap">
+      <div class="zs-foot-top">
+        <div class="zs-foot-brand">
+          <a class="zs-logo" href="#" onclick="scrollToId('hero');return false;">ZEN<em>SHA</em></a>
+          <p>Engineering premium digital systems for the next wave of serious founders, operators, and creators.</p>
+        </div>
+        <div class="zs-foot-col">
+          <h5>Services</h5>
+          <ul>
+            <li><a href="#contact" onclick="scrollToId('contact');return false;">Web Development</a></li>
+            <li><a href="#contact" onclick="scrollToId('contact');return false;">App Development</a></li>
+            <li><a href="#contact" onclick="scrollToId('contact');return false;">AI Agents</a></li>
+            <li><a href="#contact" onclick="scrollToId('contact');return false;">Chatbots</a></li>
+            <li><a href="#contact" onclick="scrollToId('contact');return false;">Email Marketing</a></li>
+            <li><a href="#contact" onclick="scrollToId('contact');return false;">Social Media</a></li>
+          </ul>
+        </div>
+        <div class="zs-foot-col">
+          <h5>Products</h5>
+          <ul>
+            <li><a href="#products" onclick="scrollToId('products');return false;">InboxZen</a></li>
+            <li><a href="#products" onclick="scrollToId('products');return false;">FlowForge</a></li>
+            <li><a href="#products" onclick="scrollToId('products');return false;">MetricMind</a></li>
+            <li><a href="#products" onclick="scrollToId('products');return false;">All Products →</a></li>
+          </ul>
+        </div>
+        <div class="zs-foot-col">
+          <h5>Studio</h5>
+          <ul>
+            <li><a href="#studio"  onclick="scrollToId('studio');return false;">About</a></li>
+            <li><a href="#work"    onclick="scrollToId('work');return false;">Work</a></li>
+            <li><a href="#process" onclick="scrollToId('process');return false;">Process</a></li>
+            <li><a href="#contact" onclick="scrollToId('contact');return false;">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="zs-foot-bot">
+        <p class="zs-foot-copy">© 2026 Zensha · All Systems Operational</p>
+        <div class="zs-foot-right">
+          <a href="https://instagram.com/the_zensha" target="_blank" rel="noopener noreferrer" class="zs-foot-soc">IG</a>
+          <a href="mailto:zenshamedia@gmail.com" class="zs-foot-soc">EM</a>
+          <a href="https://wa.me/919930563799" target="_blank" rel="noopener noreferrer" class="zs-foot-soc">WA</a>
+          <a href="https://wa.me/8660250803" target="_blank" rel="noopener noreferrer" class="zs-foot-soc">☎</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+  // ─────────────────────────────────────────────────────────────
+  // DATA
+  // ─────────────────────────────────────────────────────────────
+  const TICKS = [
+    "ZENSHA — ENGINEERED FOR SCALE",
+    "WE BUILD WHAT OTHERS ONLY PROPOSE",
+    "AI · AUTOMATION · GROWTH",
+    "PRECISION OVER POPULARITY",
+    "MICRO SAAS · BUILT & SHIPPED",
+    "YOUR COMPETITORS ARE ALREADY MOVING",
+    "NOT FOR EVERYONE — FOR THE RIGHT ONE",
+  ];
+
+  const ABILITIES = [
+    { n:"01", kw:"BUILD",     name:"Web & App Development",      desc:"Digital products built to convert, retain, and scale. Every function earns its place. Every pixel has a purpose.",                                        tags:["Web Development","Mobile Apps","UI/UX Architecture"] },
+    { n:"02", kw:"AUTOMATE",  name:"AI Agents & Chatbots",        desc:"Autonomous systems that generate revenue while you sleep. Cheaper than a hire. More consistent than a team.",                                            tags:["Custom AI Agents","Conversational AI","Workflow Automation"] },
+    { n:"03", kw:"AMPLIFY",   name:"Marketing Infrastructure",    desc:"Owned distribution systems that compound over time. Email, social, content — engineered, not improvised.",                                               tags:["Social Media Systems","Email Marketing","Growth Engineering"] },
+    { n:"04", kw:"SHIP",      name:"Micro SaaS Products",         desc:"Focused, self-contained software that solves one problem exceptionally well. AI-native and built to sell from day one.",                                  tags:["Productivity SaaS","AI-Powered Tools","Automation Products"] },
+  ];
+
+  const SAAS = [
+    { icon:"🧠", name:"InboxZen",    desc:"AI-powered email triage and reply assistant. Connects to Gmail and Outlook. Handles 80% of routine correspondence — autonomously.",                                               badge:"AI-Powered" },
+    { icon:"⚡", name:"FlowForge",   desc:"Visual workflow builder for non-technical operators. Create complex multi-step automations on a drag-and-drop canvas. Zero code.",                                                  badge:"Automation" },
+    { icon:"📊", name:"MetricMind",  desc:"Unified analytics OS that pulls from every tool in your stack. One view. AI-generated weekly insight reports — straight to your inbox.",                                           badge:"Productivity" },
+  ];
+
+  const CASES = [
+    { id:"ZS—001", chip:"AI DEPLOYMENT",  title:"ShopMind — AI Commerce Intelligence for E-Commerce Stores",   problem:"High-intent buyers abandoning carts at scale. Support SLAs consistently broken. Revenue bleeding through every unguided session.",                                                   solution:"GPT-4o assistant trained on live product catalog, brand voice, and purchase history. Embedded directly in the checkout flow.",                                                          stack:"Next.js · OpenAI API · Shopify API · Edge Runtime",          outcomes:[{n:"+38%",l:"Conversion Lift"},{n:"94%",l:"Query Resolution"},{n:"$0.009",l:"Per Interaction"}] },
+    { id:"ZS—002", chip:"INTERNAL BUILD", title:"FlowDeck — Email Intelligence Operating System",              problem:"Revenue teams managing drip campaigns blind. No unified view. $2K/month in tool sprawl. Zero AI in the loop.",                                                                     solution:"Unified command center spanning major ESPs. AI-generated copy, predictive send-time optimization, and real-time segment modeling.",                                                     stack:"React · Node.js · OpenAI API · Resend · Prisma",              outcomes:[{n:"+52%",l:"Open Rate Delta"},{n:"−74%",l:"Manual Ops Time"},{n:"1 View",l:"Full Funnel"}] },
+    { id:"ZS—003", chip:"CONCEPT SYSTEM", title:"PresencePro — Brand Operating System for High-Output Creators", problem:"Creators building audiences on rented platforms. Zero owned distribution. No monetization architecture. No compounding strategy.",                                              solution:"End-to-end brand OS: portfolio + email capture + AI writing assistant + content scheduler + analytics — as one coherent system.",                                                      stack:"Next.js · Supabase · OpenAI API · Resend · Vercel",           outcomes:[{n:"3×",l:"Lead Velocity"},{n:"4.2×",l:"Conversion Rate"},{n:"2 wks",l:"Zero to Live"}] },
+  ];
+
+  const PHASES = [
+    { n:"01", name:"Discovery",    dur:"Days 1–3",   desc:"We find the real constraint — not the one you described. Business model, growth ceilings, technical debt. All exposed." },
+    { n:"02", name:"Architecture", dur:"Days 4–6",   desc:"System design before a single line of code. Stack selection, data model, API contracts. No guesswork survives." },
+    { n:"03", name:"Execution",    dur:"Days 7–21",  desc:"Rapid iterative delivery with daily async updates. No surprises. No scope creep. No junior handoffs on your engagement." },
+    { n:"04", name:"Hardening",    dur:"Days 22–26", desc:"Load tests, edge case audit, performance review. We don't ship until it can absorb real traffic without flinching." },
+    { n:"05", name:"Scale",        dur:"Ongoing",    desc:"Post-launch optimization on a continuous cycle. Systems that compound the initial investment month after month." },
+  ];
+
+  const MANIFESTO = [
+    { html:"<strong>We are small by design.</strong> Four to six active engagements at any time — not from lack of capacity, but because diluted attention is a direct tax on your outcome." },
+    { html:"Every system we build is engineered to outlive the engagement. <strong>You're not paying for our time. You're paying for what it produces long after we leave.</strong>" },
+    { html:"<strong>We've walked away from more projects than most studios have won.</strong> We say no to protect the yes — and every client who works with us feels that difference immediately." },
+  ];
+
+  // ─────────────────────────────────────────────────────────────
+  // RENDER DYNAMIC SECTIONS
+  // ─────────────────────────────────────────────────────────────
+
+  // Ticker
+  const tickAll = [...TICKS, ...TICKS].map(t => `<span class="zs-tick">${t} <span class="zs-tick-dot"> · </span></span>`).join('');
+  document.getElementById('zs-ticker-track').innerHTML = tickAll;
+
+  // Abilities
+  document.getElementById('zs-able').innerHTML = ABILITIES.map((ab, i) => `
+    <div class="zs-row rev d${i+1}" onclick="scrollToId('contact')" style="cursor:pointer;">
+      <div class="zs-row-glow"></div>
+      <div class="zs-row-n">${ab.n}</div>
+      <div class="zs-row-kw">${ab.kw}</div>
+      <div class="zs-row-body">
+        <div class="zs-row-name">${ab.name}</div>
+        <div class="zs-row-desc">${ab.desc}</div>
+        <div class="zs-tags">${ab.tags.map(t => `<span class="zs-tag">${t}</span>`).join('')}</div>
+      </div>
+      <div class="zs-row-arr">→</div>
+    </div>
+  `).join('');
+
+  // SaaS
+  document.getElementById('zs-saas-grid').innerHTML = SAAS.map((p, i) => `
+    <div class="zs-saas-card rev d${i+1}" onclick="scrollToId('contact')" style="cursor:pointer;">
+      <span class="zs-saas-icon">${p.icon}</span>
+      <div class="zs-saas-name">${p.name}</div>
+      <div class="zs-saas-desc">${p.desc}</div>
+      <div class="zs-saas-badge">${p.badge}</div>
+    </div>
+  `).join('');
+
+  // Cases
+  document.getElementById('zs-cases').innerHTML = CASES.map((c, i) => `
+    <div class="zs-case rev d${(i%2)+1}">
+      <div class="zs-case-shine"></div>
+      <div class="zs-case-mid">
+        <div class="zs-case-title">${c.title}</div>
+        <div class="zs-case-fields">
+          ${[["Problem",c.problem],["Solution",c.solution],["Stack",c.stack]].map(([l,v]) => `
+            <div>
+              <div class="zs-cf-l">${l}</div>
+              <div class="zs-cf-v">${v}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="zs-case-right">
+        ${c.outcomes.map(o => `
+          <div class="zs-out">
+            <span class="zs-out-n">${o.n}</span>
+            <span class="zs-out-l">${o.l}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Phases
+  document.getElementById('zs-phases').innerHTML = PHASES.map((ph, i) => `
+    <div class="zs-phase rev d${i+1}">
+      <div class="zs-phase-bg"></div>
+      <div class="zs-phase-n">${ph.n}</div>
+      <div class="zs-phase-name">${ph.name}</div>
+      <div class="zs-phase-desc">${ph.desc}</div>
+      <div class="zs-phase-dur">${ph.dur}</div>
+    </div>
+  `).join('');
+
+  // Manifesto
+  document.getElementById('zs-manifesto').innerHTML = MANIFESTO.map(m => `
+    <div class="zs-man-line"><p>${m.html}</p></div>
+  `).join('');
+
+  // ─────────────────────────────────────────────────────────────
+  // THREE.JS — TORUS KNOT + PARTICLE FIELD
+  // ─────────────────────────────────────────────────────────────
+  (function initScene() {
+    const canvas = document.getElementById('zs-canvas');
+    const W = window.innerWidth, H = window.innerHeight;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+    renderer.setClearColor(0, 0);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(58, W / H, 0.1, 900);
+    camera.position.z = 88;
+
+    const knot = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(18, 5.8, 180, 18, 2, 3),
+      new THREE.MeshBasicMaterial({ color: 0xCC0000, wireframe: true, transparent: true, opacity: 0.72 })
+    );
+    knot.position.set(58, 3, -22);
+    scene.add(knot);
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(36, 0.8, 6, 90),
+      new THREE.MeshBasicMaterial({ color: 0xCC0000, transparent: true, opacity: 0.35 })
+    );
+    ring.position.copy(knot.position);
+    ring.rotation.x = 0.9;
+    scene.add(ring);
+
+    const knot2 = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(22, 2.5, 120, 12, 3, 5),
+      new THREE.MeshBasicMaterial({ color: 0x880000, wireframe: true, transparent: true, opacity: 0.28 })
+    );
+    knot2.position.set(58, 3, -22);
+    scene.add(knot2);
+
+    const N = 110;
+    const pBuf = new Float32Array(N * 3);
+    const pPos = [], pVel = [];
+    for (let i = 0; i < N; i++) {
+      const x = (Math.random() - 0.5) * 220;
+      const y = (Math.random() - 0.5) * 130;
+      const z = (Math.random() - 0.5) * 60;
+      pBuf[i*3] = x; pBuf[i*3+1] = y; pBuf[i*3+2] = z;
+      pPos.push(new THREE.Vector3(x, y, z));
+      pVel.push(new THREE.Vector3(
+        (Math.random()-0.5)*0.013,
+        (Math.random()-0.5)*0.009,
+        (Math.random()-0.5)*0.004
+      ));
+    }
+    const ptGeo = new THREE.BufferGeometry();
+    ptGeo.setAttribute("position", new THREE.BufferAttribute(pBuf, 3));
+    scene.add(new THREE.Points(ptGeo,
+      new THREE.PointsMaterial({ color: 0xCC0000, size: 1.4, transparent: true, opacity: 0.75 })
+    ));
+
+    const LMAX = 200;
+    const lBuf = new Float32Array(LMAX * 6);
+    const lGeo = new THREE.BufferGeometry();
+    lGeo.setAttribute("position", new THREE.BufferAttribute(lBuf, 3));
+    scene.add(new THREE.LineSegments(lGeo,
+      new THREE.LineBasicMaterial({ color: 0xCC0000, transparent: true, opacity: 0.28 })
+    ));
+
+    let mx = 0, my = 0;
+    window.addEventListener("mousemove", e => {
+      mx = e.clientX / window.innerWidth - 0.5;
+      my = e.clientY / window.innerHeight - 0.5;
+    });
+
+    let t = 0;
+    (function tick() {
+      requestAnimationFrame(tick);
+      t += 0.0035;
+
+      knot.rotation.x  = t * 0.17;
+      knot.rotation.y  = t * 0.24;
+      knot2.rotation.x = -t * 0.12;
+      knot2.rotation.y = t * 0.19;
+      ring.rotation.z  = t * 0.07;
+      ring.rotation.y  = t * 0.04;
+
+      for (let i = 0; i < N; i++) {
+        pPos[i].add(pVel[i]);
+        if (Math.abs(pPos[i].x) > 110) pVel[i].x *= -1;
+        if (Math.abs(pPos[i].y) > 65)  pVel[i].y *= -1;
+        if (Math.abs(pPos[i].z) > 30)  pVel[i].z *= -1;
+        pBuf[i*3]   = pPos[i].x;
+        pBuf[i*3+1] = pPos[i].y;
+        pBuf[i*3+2] = pPos[i].z;
+      }
+      ptGeo.attributes.position.needsUpdate = true;
+
+      let c = 0;
+      for (let i = 0; i < N && c < LMAX; i++) {
+        for (let j = i+1; j < N && c < LMAX; j++) {
+          if (pPos[i].distanceTo(pPos[j]) < 32) {
+            const b = c*6;
+            lBuf[b]   = pPos[i].x; lBuf[b+1] = pPos[i].y; lBuf[b+2] = pPos[i].z;
+            lBuf[b+3] = pPos[j].x; lBuf[b+4] = pPos[j].y; lBuf[b+5] = pPos[j].z;
+            c++;
+          }
+        }
+      }
+      lGeo.attributes.position.needsUpdate = true;
+      lGeo.setDrawRange(0, c * 2);
+
+      camera.position.x += (mx * 20 - camera.position.x) * 0.022;
+      camera.position.y += (-my * 12 - camera.position.y) * 0.022;
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+    })();
+
+    window.addEventListener("resize", () => {
+      const nw = window.innerWidth, nh = window.innerHeight;
+      camera.aspect = nw / nh;
+      camera.updateProjectionMatrix();
+      renderer.setSize(nw, nh);
+    });
+  })();
+
+  // ─────────────────────────────────────────────────────────────
+  // CURSOR
+  // ─────────────────────────────────────────────────────────────
+  (function initCursor() {
+    const dot  = document.getElementById('zs-cur-dot');
+    const ring = document.getElementById('zs-cur-ring');
+    let rx=0, ry=0, ax=0, ay=0;
+    window.addEventListener("mousemove", e => { rx = e.clientX; ry = e.clientY; });
+    (function loop() {
+      requestAnimationFrame(loop);
+      dot.style.left = rx + "px"; dot.style.top = ry + "px";
+      ax += (rx - ax) * 0.1; ay += (ry - ay) * 0.1;
+      ring.style.left = ax + "px"; ring.style.top = ay + "px";
+    })();
+  })();
+
+  // ─────────────────────────────────────────────────────────────
+  // SCROLL REVEAL
+  // ─────────────────────────────────────────────────────────────
+  const io = new IntersectionObserver(
+    entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("vis"); }),
+    { threshold: 0.065 }
+  );
+  document.querySelectorAll(".rev").forEach(el => io.observe(el));
+
+  // ─────────────────────────────────────────────────────────────
+  // PROGRESS BAR
+  // ─────────────────────────────────────────────────────────────
+  const bar = document.getElementById('zs-bar');
+  window.addEventListener("scroll", () => {
+    const total = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (window.scrollY / total * 100) + "%";
+  }, { passive: true });
+
+  // ─────────────────────────────────────────────────────────────
+  // STUCK NAV
+  // ─────────────────────────────────────────────────────────────
+  const nav = document.getElementById('zs-nav');
+  window.addEventListener("scroll", () => {
+    nav.classList.toggle("stuck", window.scrollY > 60);
+  }, { passive: true });
+
+  // ─────────────────────────────────────────────────────────────
+  // LOADER
+  // ─────────────────────────────────────────────────────────────
+  setTimeout(() => {
+    document.getElementById('zs-loader').classList.add('hide');
+  }, 2200);
+
+  // ─────────────────────────────────────────────────────────────
+  // MOBILE MENU
+  // ─────────────────────────────────────────────────────────────
+  const hamburger   = document.getElementById('zs-hamburger');
+  const mobileMenu  = document.getElementById('zs-mobile-menu');
+  let menuOpen = false;
+
+  hamburger.addEventListener('click', () => {
+    menuOpen = !menuOpen;
+    hamburger.classList.toggle('open', menuOpen);
+    mobileMenu.classList.toggle('open', menuOpen);
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // SCROLL TO
+  // ─────────────────────────────────────────────────────────────
+  function scrollToId(id) {
+    if (menuOpen) {
+      menuOpen = false;
+      hamburger.classList.remove('open');
+      mobileMenu.classList.remove('open');
+      document.body.style.overflow = '';
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 350);
+    } else {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // FORM SUBMIT
+  // ─────────────────────────────────────────────────────────────
+  async function handleForm(e) {
+    e.preventDefault();
+    const btn = document.getElementById('f-submit');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    await new Promise(r => setTimeout(r, 1400));
+    const wrap = document.getElementById('zs-form-wrap');
+    wrap.innerHTML = `
+      <div class="zs-form-success">
+        <div class="zs-form-success-icon">✓</div>
+        <h3>Brief Received.</h3>
+        <p>We'll review your project and get back to you within 24 hours. Keep building.</p>
+      </div>
+    `;
+  }
+  </script>
+</body>
+</html>
