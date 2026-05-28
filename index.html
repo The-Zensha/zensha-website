@@ -1,2951 +1,1065 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZENSHA — Digital Systems Studio</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=JetBrains+Mono:wght@400;500;700&display=swap');
-@import url('https://fonts.cdnfonts.com/css/st-tokyo');
-
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-  --void:    #ffffff;
-  --ink:     #f5f5f5;
-  --surface: #efefef;
-  --lift:    #e8e8e8;
-  --gold:    #CC0000;
-  --gold-lo: rgba(204,0,0,0.055);
-  --gold-md: rgba(204,0,0,0.13);
-  --gold-hi: rgba(204,0,0,0.4);
-  --text:    #000000;
-  --muted:   #2a2a2a;
-  --dim:     #666666;
-  --edge:    rgba(0,0,0,0.12);
-  --edge-g:  rgba(204,0,0,0.18);
-}
-
-html { scroll-behavior: smooth; }
-
-body {
-  background: var(--void);
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-}
-
-::selection { background: var(--gold); color: #fff; }
-
-/* ── CURSOR ── */
-* { cursor: none !important; }
-#zs-cur-dot {
-  position: fixed; width: 8px; height: 8px;
-  background: #CC0000;
-  border-radius: 50%;
-  pointer-events: none; z-index: 9999;
-  transform: translate(-50%, -50%);
-  transition: width .15s, height .15s, opacity .15s, background .18s ease;
-  will-change: left, top;
-}
-#zs-cur-ring {
-  position: fixed; width: 32px; height: 32px;
-  border: 1.5px solid rgba(204,0,0,.5);
-  border-radius: 50%; pointer-events: none; z-index: 9998;
-  transform: translate(-50%, -50%);
-  transition: width .3s cubic-bezier(.16,1,.3,1),
-              height .3s cubic-bezier(.16,1,.3,1),
-              border-color .18s ease;
-  will-change: left, top;
-}
-body.cursor-on-dark #zs-cur-dot { background: #ffffff; }
-body.cursor-on-dark #zs-cur-ring { border-color: rgba(255,255,255,.65); }
-body.cursor-on-red  #zs-cur-dot { background: #ffffff; }
-body.cursor-on-red  #zs-cur-ring { border-color: rgba(255,255,255,.7); }
-body.cursor-on-light #zs-cur-dot { background: #CC0000; }
-body.cursor-on-light #zs-cur-ring { border-color: rgba(204,0,0,.5); }
-body:has(a:hover) #zs-cur-ring,
-body:has(button:hover) #zs-cur-ring { width: 54px; height: 54px; }
-
-/* ── FILM GRAIN ── */
-#zs-grain {
-  position: fixed; inset: 0; z-index: 998; pointer-events: none; opacity: .025;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-  animation: grainShift 1.8s steps(2) infinite;
-}
-@keyframes grainShift {
-  0%   { transform: translate(0,0); }
-  25%  { transform: translate(-3px, 2px); }
-  50%  { transform: translate(3px,-2px); }
-  75%  { transform: translate(-1px, 3px); }
-  100% { transform: translate(2px,-1px); }
-}
-
-/* ── PROGRESS BAR ── */
-#zs-bar {
-  position: fixed; top: 0; left: 0; width: 0%;
-  height: 2px; background: var(--gold); z-index: 701;
-  transition: width .08s linear;
-  box-shadow: 0 0 8px rgba(204,0,0,.4);
-}
-
-/* ── SCANLINE FLICKER ── */
-#zs-scan {
-  position: fixed; inset: 0; z-index: 997; pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 3px,
-    rgba(0,0,0,.006) 3px,
-    rgba(0,0,0,.006) 4px
-  );
-}
-
-/* ─────────────────────────────── NAV ─────────────────────────────── */
-.zs-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 600;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 38px 88px;
-  border-bottom: 1px solid transparent;
-  transition: padding .55s cubic-bezier(.16,1,.3,1),
-              background .55s, border-color .55s;
-}
-.zs-nav.stuck {
-  padding: 18px 88px;
-  background: rgba(255,255,255,.96);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-  border-color: var(--edge);
-}
-.zs-logo {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.55rem; letter-spacing: 9px; text-transform: uppercase;
-  color: var(--text); text-decoration: none; position: relative;
-}
-.zs-logo em { color: var(--gold); font-style: normal; }
-.zs-logo::after {
-  content: '';
-  position: absolute; bottom: -3px; left: 0; width: 0;
-  height: 1px; background: var(--gold);
-  transition: width .4s ease;
-}
-.zs-logo:hover::after { width: 100%; }
-
-.zs-nav-links { display: flex; gap: 48px; }
-.zs-nav-links a {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .56rem; letter-spacing: 3px; text-transform: uppercase;
-  color: #111; text-decoration: none;
-  transition: color .3s; position: relative;
-}
-.zs-nav-links a::after {
-  content: '';
-  position: absolute; bottom: -4px; left: 0; width: 0;
-  height: 1px; background: var(--gold);
-  transition: width .35s ease;
-}
-.zs-nav-links a:hover { color: var(--text); }
-.zs-nav-links a:hover::after { width: 100%; }
-
-.zs-nav-right { display: flex; align-items: center; gap: 28px; }
-.zs-live {
-  display: flex; align-items: center; gap: 9px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .54rem; letter-spacing: 2.5px; text-transform: uppercase;
-  color: #111;
-}
-.zs-live-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--gold);
-  animation: livePulse 2.5s ease infinite;
-}
-@keyframes livePulse {
-  0%,100% { opacity:1; box-shadow:0 0 0 0 rgba(204,0,0,.55); }
-  50%      { opacity:.55; box-shadow:0 0 0 5px rgba(204,0,0,0); }
-}
-
-.zs-btn-primary {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .68rem; letter-spacing: 3.5px; text-transform: uppercase;
-  background: var(--gold); color: #fff;
-  border: none; padding: 12px 30px;
-  position: relative; overflow: hidden;
-  transition: box-shadow .35s;
-}
-.zs-btn-primary::after {
-  content: ''; position: absolute; inset: 0;
-  background: rgba(255,255,255,.18);
-  transform: translateX(-101%);
-  transition: transform .38s cubic-bezier(.16,1,.3,1);
-}
-.zs-btn-primary:hover::after { transform: translateX(0); }
-.zs-btn-primary:hover { box-shadow: 0 0 44px rgba(204,0,0,.35); }
-
-/* ─────────────────────────────── HERO ─────────────────────────────── */
-.zs-hero {
-  position: relative; height: 100vh; min-height: 780px;
-  display: flex; align-items: center; overflow: hidden;
-}
-#zs-canvas { position: absolute; inset: 0; z-index: 0; }
-
-.zs-hero-veil {
-  position: absolute; inset: 0; z-index: 1;
-  background:
-    radial-gradient(ellipse 50% 70% at 72% 44%, rgba(204,0,0,.04) 0%, transparent 55%),
-    linear-gradient(105deg, rgba(255,255,255,.82) 38%, rgba(255,255,255,.05) 100%),
-    linear-gradient(to top, rgba(255,255,255,.95) 0%, transparent 22%);
-}
-
-.zs-hero-glyph {
-  position: absolute; right: -60px; top: 50%;
-  transform: translateY(-50%);
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 42vw; color: rgba(204,0,0,.018);
-  line-height: .85; pointer-events: none; user-select: none;
-  z-index: 1; letter-spacing: -20px;
-  animation: glyphFloat 12s ease-in-out infinite;
-}
-@keyframes glyphFloat {
-  0%,100% { transform: translateY(-50%) translateX(0); }
-  50%     { transform: translateY(-52%) translateX(-12px); }
-}
-
-.zs-hero-body { position: relative; z-index: 2; padding: 0 88px; }
-
-.zs-pre {
-  display: flex; align-items: center; gap: 20px;
-  margin-bottom: 52px;
-  opacity: 0; animation: slideUp .8s cubic-bezier(.16,1,.3,1) .2s forwards;
-}
-.zs-pre-bar { width: 36px; height: 1px; background: var(--gold); }
-.zs-pre-txt {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .57rem; letter-spacing: 4.5px; text-transform: uppercase;
-  color: var(--gold);
-}
-.zs-pre-sep { color: var(--muted); font-size: .8rem; }
-
-.zs-h1 {
-  font-family: 'ST Tokyo', 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2.6rem, 5.2vw, 6rem);
-  line-height: 1.05; letter-spacing: -2px;
-  margin-bottom: 52px;
-  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .36s forwards;
-}
-.zs-h1 .s1 { display: block; color: var(--text); }
-.zs-h1 .s2 { display: block; color: var(--text); }
-.zs-h1 .s3 { display: block; color: var(--gold); }
-.zs-h1 .s4 { display: block; color: var(--text); font-size: .55em; letter-spacing: 0px; font-weight: 600; margin-top: 18px; line-height: 1.3; border-left: 3px solid var(--gold); padding-left: 18px; }
-
-.zs-hero-copy {
-  font-size: .98rem; font-weight: 400; line-height: 1.88;
-  color: #111; max-width: 360px; margin-bottom: 60px;
-  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .52s forwards;
-}
-.zs-hero-copy strong { color: #000; font-weight: 700; }
-
-.zs-hero-btns {
-  display: flex; gap: 14px; flex-wrap: wrap;
-  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .68s forwards;
-}
-
-.zs-btn-a {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
-  background: var(--gold); color: #fff;
-  border: none; padding: 18px 52px;
-  position: relative; overflow: hidden;
-  transition: box-shadow .35s;
-}
-.zs-btn-a::after {
-  content: ''; position: absolute; inset: 0;
-  background: rgba(255,255,255,.18);
-  transform: translateX(-101%);
-  transition: transform .38s cubic-bezier(.16,1,.3,1);
-}
-.zs-btn-a:hover::after { transform: translateX(0); }
-.zs-btn-a:hover { box-shadow: 0 0 52px rgba(204,0,0,.38); }
-
-.zs-btn-b {
-  font-family: 'Syne', sans-serif; font-weight: 600;
-  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
-  background: transparent; color: var(--text);
-  border: 1px solid rgba(0,0,0,.14);
-  padding: 18px 52px; transition: all .35s;
-}
-.zs-btn-b:hover { border-color: rgba(204,0,0,.38); color: var(--gold); }
-
-.zs-hero-aside {
-  position: absolute; right: 88px; bottom: 72px; z-index: 2;
-  display: flex; flex-direction: column; gap: 11px; align-items: flex-end;
-  opacity: 0; animation: fadeIn .9s ease 1.1s forwards;
-}
-.zs-aside-row {
-  display: flex; align-items: center; gap: 12px;
-}
-.zs-aside-k {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase; color: #888;
-}
-.zs-aside-v {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase; color: #222;
-}
-
-.zs-scroll {
-  position: absolute; left: 88px; bottom: 72px; z-index: 2;
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  opacity: 0; animation: fadeIn .9s ease 1.2s forwards;
-}
-.zs-scroll-line {
-  width: 1px; height: 60px;
-  background: linear-gradient(to bottom, var(--gold), transparent);
-  animation: scrollPulse 2.2s ease infinite;
-}
-@keyframes scrollPulse {
-  0%   { transform: scaleY(0); transform-origin: top;    opacity: 1; }
-  49%  { transform: scaleY(1); transform-origin: top;    opacity: 1; }
-  50%  { transform: scaleY(1); transform-origin: bottom; opacity: 1; }
-  100% { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
-}
-.zs-scroll-lbl {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase;
-  color: #333; writing-mode: vertical-rl; transform: rotate(180deg);
-}
-
-/* ─────────────────────────────── TICKER ─────────────────────────────── */
-.zs-ticker {
-  background: var(--gold); overflow: hidden;
-  padding: 13px 0; position: relative; z-index: 5;
-}
-.zs-ticker-track {
-  display: inline-flex; white-space: nowrap;
-  animation: tickRun 30s linear infinite;
-}
-.zs-ticker-track:hover { animation-play-state: paused; }
-@keyframes tickRun {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-.zs-tick {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .66rem; letter-spacing: 5px; text-transform: uppercase;
-  color: #fff; padding: 0 36px;
-}
-.zs-tick-dot { color: rgba(255,255,255,.35); }
-
-/* ─────────────────────────────── SHARED ─────────────────────────────── */
-.zs-sect { padding: 160px 88px; }
-.zs-wrap { max-width: 1280px; margin: 0 auto; }
-
-.zs-eye {
-  display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
-}
-.zs-eye-n {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .53rem; letter-spacing: 2.5px; color: #444;
-}
-.zs-eye-bar { width: 1px; height: 18px; background: #bbb; }
-.zs-eye-t {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .53rem; letter-spacing: 4px; text-transform: uppercase; color: #444;
-}
-.zs-eye-dot {
-  width: 4px; height: 4px; border-radius: 50%;
-  background: var(--gold);
-}
-
-.zs-sh {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2.9rem, 5.5vw, 6.5rem);
-  line-height: .9; letter-spacing: -2.5px;
-}
-.zs-sh em { color: var(--gold); font-style: normal; }
-
-/* ── REVEAL ── */
-.rev {
-  opacity: 0; transform: translateY(36px);
-  transition: opacity .95s cubic-bezier(.16,1,.3,1),
-              transform .95s cubic-bezier(.16,1,.3,1);
-}
-.rev.vis { opacity: 1; transform: translateY(0); }
-.rev.d1 { transition-delay: .08s; }
-.rev.d2 { transition-delay: .2s; }
-.rev.d3 { transition-delay: .32s; }
-.rev.d4 { transition-delay: .44s; }
-.rev.d5 { transition-delay: .56s; }
-
-/* ─────────────────────────────── CAPABILITIES ─────────────────────────────── */
-.zs-cap { background: var(--ink); position: relative; }
-.zs-cap::after {
-  content: ''; position: absolute; bottom: 0; left: 88px; right: 88px;
-  height: 1px;
-  background: linear-gradient(to right, transparent, rgba(204,0,0,.12), transparent);
-}
-
-.zs-cap-hd {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 110px; align-items: end; margin-bottom: 100px;
-}
-.zs-cap-aside p {
-  font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88; max-width: 420px;
-}
-.zs-cap-aside strong { color: #000; font-weight: 700; }
-.zs-cap-note {
-  display: flex; align-items: center; gap: 14px; margin-top: 24px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .54rem; letter-spacing: 3px; text-transform: uppercase; color: var(--gold);
-}
-.zs-cap-note::before { content:''; width:14px; height:1px; background:var(--gold); }
-
-.zs-able { display: flex; flex-direction: column; gap: 2px; }
-
-.zs-row {
-  display: grid;
-  grid-template-columns: 52px 200px 1fr 52px;
-  align-items: center; gap: 72px;
-  padding: 52px 64px;
-  background: var(--void);
-  border: 1px solid transparent;
-  position: relative; overflow: hidden;
-  transition: background .4s, border-color .4s;
-}
-.zs-row::before {
-  content: ''; position: absolute;
-  left: 0; top: 0; bottom: 0; width: 2px;
-  background: var(--gold);
-  transform: scaleY(0); transform-origin: bottom;
-  transition: transform .5s cubic-bezier(.16,1,.3,1);
-}
-.zs-row-glow {
-  position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(204,0,0,.018) 0%, transparent 55%);
-  opacity: 0; transition: opacity .45s;
-  pointer-events: none;
-}
-.zs-row:hover { background: var(--surface); border-color: var(--edge-g); }
-.zs-row:hover::before { transform: scaleY(1); }
-.zs-row:hover .zs-row-glow { opacity: 1; }
-
-.zs-row-n {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .53rem; letter-spacing: 2px; color: #777;
-}
-.zs-row-kw {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 3rem; text-transform: uppercase;
-  color: var(--text); transition: color .35s; line-height: 1;
-}
-.zs-row:hover .zs-row-kw { color: var(--gold); }
-
-.zs-row-name {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .9rem; letter-spacing: 1.5px; text-transform: uppercase;
-  color: var(--text); margin-bottom: 9px;
-}
-.zs-row-desc { font-size: .84rem; font-weight: 400; color: #333; line-height: 1.72; margin-bottom: 14px; }
-.zs-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.zs-tag {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 1.5px; text-transform: uppercase;
-  color: #444; border: 1px solid #999; padding: 4px 10px;
-  transition: border-color .3s, color .3s;
-}
-.zs-row:hover .zs-tag { border-color: rgba(204,0,0,.2); color: rgba(204,0,0,.7); }
-.zs-row-arr {
-  color: #777; font-size: 1.1rem;
-  transition: color .3s, transform .35s cubic-bezier(.16,1,.3,1);
-}
-.zs-row:hover .zs-row-arr { color: var(--gold); transform: translateX(7px); }
-
-/* ─────────────────────────────── MICRO SAAS ─────────────────────────────── */
-.zs-saas { background: var(--surface); }
-
-.zs-saas-hd {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 110px; align-items: end; margin-bottom: 88px;
-}
-.zs-saas-note {
-  font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88;
-}
-.zs-saas-note strong { color: #000; font-weight: 700; }
-
-.zs-saas-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-.zs-saas-card {
-  background: var(--void);
-  border: 1px solid var(--edge);
-  padding: 52px 44px;
-  position: relative; overflow: hidden;
-  transition: border-color .45s, transform .45s cubic-bezier(.16,1,.3,1);
-}
-.zs-saas-card:hover { border-color: var(--edge-g); transform: translateY(-7px); }
-.zs-saas-card::after {
-  content: ''; position: absolute;
-  bottom: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--gold), rgba(204,0,0,.2));
-  transform: scaleX(0); transform-origin: left;
-  transition: transform .55s cubic-bezier(.16,1,.3,1);
-}
-.zs-saas-card:hover::after { transform: scaleX(1); }
-.zs-saas-card::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(204,0,0,.03), transparent 60%);
-  opacity: 0; transition: opacity .45s;
-}
-.zs-saas-card:hover::before { opacity: 1; }
-
-.zs-saas-icon { font-size: 2.4rem; margin-bottom: 32px; display: block; }
-.zs-saas-name {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: 1.08rem; margin-bottom: 14px; line-height: 1.25;
-}
-.zs-saas-desc {
-  font-size: .83rem; font-weight: 400; color: #333;
-  line-height: 1.78; margin-bottom: 30px;
-}
-.zs-saas-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2.5px; text-transform: uppercase;
-  color: var(--gold); background: var(--gold-lo);
-  border: 1px solid rgba(204,0,0,.14); padding: 5px 13px;
-}
-.zs-saas-badge::before {
-  content: ''; width: 4px; height: 4px; border-radius: 50%;
-  background: var(--gold);
-}
-
-/* ─────────────────────────────── WORK ─────────────────────────────── */
-.zs-work { background: var(--ink); }
-
-.zs-work-hd {
-  display: flex; justify-content: space-between;
-  align-items: flex-end; margin-bottom: 88px; gap: 80px;
-}
-.zs-work-note {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .57rem; letter-spacing: 2px; text-transform: uppercase;
-  color: #333; line-height: 1.9; text-align: right; max-width: 220px;
-}
-
-.zs-cases { display: flex; flex-direction: column; gap: 2px; }
-
-.zs-case {
-  display: grid; grid-template-columns: 1fr 260px;
-  gap: 80px; align-items: start;
-  background: var(--void); border: 1px solid transparent;
-  padding: 64px 72px;
-  position: relative; overflow: hidden;
-  transition: background .45s, border-color .45s;
-}
-.zs-case::after {
-  content: ''; position: absolute;
-  right: 0; top: 0; bottom: 0; width: 2px;
-  background: var(--gold); transform: scaleY(0); transform-origin: top;
-  transition: transform .55s cubic-bezier(.16,1,.3,1);
-}
-.zs-case-shine {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse 40% 60% at 90% 20%, rgba(204,0,0,.025), transparent 60%);
-  opacity: 0; transition: opacity .45s; pointer-events: none;
-}
-.zs-case:hover { background: var(--surface); border-color: var(--edge-g); }
-.zs-case:hover::after { transform: scaleY(1); }
-.zs-case:hover .zs-case-shine { opacity: 1; }
-
-.zs-case-id {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 2.5px; color: #555; margin-bottom: 16px;
-}
-.zs-case-chip {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase;
-  color: var(--gold); background: var(--gold-lo);
-  border: 1px solid rgba(204,0,0,.15); padding: 5px 12px; margin-bottom: 40px;
-}
-.zs-case-chip::before {
-  content: ''; width: 4px; height: 4px; border-radius: 50%;
-  background: var(--gold); animation: livePulse 2s ease infinite;
-}
-.zs-case-n {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 7rem; line-height: 1;
-  color: rgba(204,0,0,.045);
-}
-
-.zs-case-title {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: 1.28rem; line-height: 1.3; margin-bottom: 44px;
-}
-.zs-case-fields { display: flex; flex-direction: column; gap: 24px; }
-.zs-cf-l {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 8px;
-}
-.zs-cf-v { font-size: .83rem; font-weight: 400; color: #333; line-height: 1.65; }
-
-.zs-case-right { display: flex; flex-direction: column; gap: 28px; padding-top: 4px; }
-.zs-out {
-  border-left: 1px solid #aaa; padding-left: 24px;
-  transition: border-color .35s;
-}
-.zs-case:hover .zs-out { border-color: rgba(204,0,0,.25); }
-.zs-out-n {
-  display: block;
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 2.4rem; line-height: 1; color: var(--gold); margin-bottom: 6px;
-}
-.zs-out-l {
-  display: block;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase; color: #444;
-}
-
-/* ─────────────────────────────── PROCESS ─────────────────────────────── */
-.zs-proc { background: var(--void); }
-
-.zs-proc-hd {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 110px; align-items: end; margin-bottom: 88px;
-}
-.zs-proc-hd > p { font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88; }
-
-.zs-phases { display: flex; flex-direction: column; }
-
-.zs-phase {
-  display: grid;
-  grid-template-columns: 88px 240px 1fr auto;
-  gap: 72px; align-items: center;
-  padding: 50px 0;
-  border-bottom: 1px solid var(--edge);
-  position: relative; overflow: hidden;
-  transition: padding-left .45s cubic-bezier(.16,1,.3,1);
-}
-.zs-phase:first-child { border-top: 1px solid var(--edge); }
-.zs-phase-bg {
-  position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(204,0,0,.015) 0%, transparent 50%);
-  opacity: 0; transition: opacity .45s; pointer-events: none;
-}
-.zs-phase:hover { padding-left: 30px; }
-.zs-phase:hover .zs-phase-bg { opacity: 1; }
-
-.zs-phase-n {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 5rem; color: #bbb; line-height: 1;
-  transition: color .35s;
-}
-.zs-phase:hover .zs-phase-n { color: rgba(204,0,0,.35); }
-.zs-phase-name {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; color: #000;
-}
-.zs-phase-desc { font-size: .83rem; font-weight: 400; color: #333; line-height: 1.75; }
-.zs-phase-dur {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 2px; text-transform: uppercase;
-  color: #555; white-space: nowrap;
-}
-
-/* ─────────────────────────────── MANIFESTO ─────────────────────────────── */
-.zs-man {
-  background: var(--gold); position: relative; overflow: hidden;
-}
-.zs-man-glyph {
-  position: absolute; right: -5%; bottom: -10%;
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 46vw; line-height: 1; color: rgba(0,0,0,.04);
-  pointer-events: none; user-select: none; letter-spacing: -20px;
-}
-.zs-man-inner {
-  max-width: 1280px; margin: 0 auto;
-  display: grid; grid-template-columns: 1fr 1.15fr;
-  gap: 130px; align-items: start; position: relative; z-index: 1;
-}
-.zs-man-eye .zs-eye-n,
-.zs-man-eye .zs-eye-t { color: rgba(255,255,255,.55); }
-.zs-man-eye .zs-eye-bar { background: rgba(255,255,255,.3); }
-.zs-man-eye .zs-eye-dot { background: rgba(255,255,255,.6); }
-
-.zs-man-h {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(3.2rem, 5.8vw, 6.5rem);
-  line-height: .9; color: #fff; letter-spacing: -3px;
-  margin-top: 24px; margin-bottom: 32px;
-}
-.zs-man-sub {
-  font-size: .9rem; font-weight: 300; color: rgba(255,255,255,.55);
-  line-height: 1.85; max-width: 310px;
-}
-
-.zs-man-lines { display: flex; flex-direction: column; padding-top: 6px; }
-.zs-man-line {
-  padding: 36px 0; border-bottom: 1px solid rgba(255,255,255,.18);
-  transition: padding-left .4s cubic-bezier(.16,1,.3,1);
-}
-.zs-man-line:first-child { border-top: 1px solid rgba(255,255,255,.18); }
-.zs-man-line:hover { padding-left: 14px; }
-.zs-man-line p { font-size: .92rem; font-weight: 300; color: rgba(255,255,255,.55); line-height: 1.85; }
-.zs-man-line p strong { color: #fff; font-weight: 600; }
-
-/* ─────────────────────────────── CONTACT ─────────────────────────────── */
-.zs-contact { background: var(--ink); position: relative; overflow: hidden; }
-.zs-contact::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse 55% 65% at 50% 100%, rgba(204,0,0,.045), transparent 55%);
-}
-.zs-contact-wrap { max-width: 1280px; margin: 0 auto; position: relative; z-index: 1; }
-.zs-contact-hd { margin-bottom: 88px; }
-.zs-contact-hd .zs-sh { margin-bottom: 24px; }
-.zs-contact-hd > p { font-size: .95rem; font-weight: 400; color: #222; line-height: 1.82; max-width: 520px; }
-.zs-contact-hd > p strong { color: #000; font-weight: 700; }
-
-.zs-cg {
-  display: grid; grid-template-columns: repeat(2, 1fr);
-  gap: 2px; margin-bottom: 2px;
-}
-
-.zs-cc {
-  background: var(--void);
-  border: 1px solid var(--edge);
-  padding: 52px 60px;
-  display: flex; flex-direction: column; gap: 14px;
-  position: relative; overflow: hidden;
-  text-decoration: none;
-  transition: border-color .45s;
-}
-.zs-cc::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(204,0,0,.4), transparent);
-  transform: scaleX(0); transform-origin: left;
-  transition: transform .55s cubic-bezier(.16,1,.3,1);
-}
-.zs-cc::after {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse 60% 60% at 50% 0%, rgba(204,0,0,.03), transparent 60%);
-  opacity: 0; transition: opacity .45s;
-}
-.zs-cc:hover { border-color: var(--edge-g); }
-.zs-cc:hover::before { transform: scaleX(1); }
-.zs-cc:hover::after { opacity: 1; }
-
-.zs-cc-type {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 4px; text-transform: uppercase; color: var(--gold);
-  position: relative; z-index: 1;
-}
-.zs-cc-icon { font-size: 2rem; position: relative; z-index: 1; }
-.zs-cc-val {
-  font-family: 'Syne', sans-serif; font-weight: 600;
-  font-size: 1.35rem; color: #000; line-height: 1.3;
-  position: relative; z-index: 1;
-}
-.zs-cc-sub {
-  font-size: .8rem; font-weight: 400; color: #444;
-  position: relative; z-index: 1;
-}
-
-.zs-contact-cta {
-  background: var(--gold); padding: 72px 88px;
-  display: flex; justify-content: space-between; align-items: center; gap: 80px;
-  position: relative; overflow: hidden;
-}
-.zs-contact-cta::before {
-  content: 'ZENSHA'; position: absolute;
-  right: -20px; top: 50%; transform: translateY(-50%);
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 18rem; color: rgba(0,0,0,.05);
-  line-height: 1; pointer-events: none; letter-spacing: -8px;
-}
-.zs-cta-h {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2rem, 3.8vw, 4rem);
-  color: #fff; line-height: 1.05; margin-bottom: 16px;
-  position: relative; z-index: 1;
-}
-.zs-cta-sub {
-  font-size: .88rem; font-weight: 300; color: rgba(255,255,255,.55);
-  line-height: 1.78; max-width: 400px; position: relative; z-index: 1;
-}
-
-.zs-btn-dark {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
-  background: #000; color: #fff;
-  border: none; padding: 20px 56px;
-  position: relative; overflow: hidden;
-  white-space: nowrap; z-index: 1;
-  transition: box-shadow .35s;
-}
-.zs-btn-dark::after {
-  content: ''; position: absolute; inset: 0;
-  background: rgba(255,255,255,.08);
-  transform: translateX(-101%);
-  transition: transform .38s cubic-bezier(.16,1,.3,1);
-}
-.zs-btn-dark:hover::after { transform: translateX(0); }
-.zs-btn-dark:hover { box-shadow: 0 0 40px rgba(0,0,0,.2); }
-
-/* ─────────────────────────────── FOOTER ─────────────────────────────── */
-.zs-footer {
-  background: #0a0a0a; border-top: 1px solid rgba(255,255,255,.06);
-  padding: 100px 88px 60px;
-}
-.zs-footer-wrap { max-width: 1280px; margin: 0 auto; }
-
-.zs-foot-top {
-  display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr;
-  gap: 100px; margin-bottom: 80px;
-}
-.zs-foot-brand .zs-logo { display: block; margin-bottom: 22px; color: #fff; }
-.zs-foot-brand .zs-logo em { color: var(--gold); }
-.zs-foot-brand p { font-size: .84rem; font-weight: 400; color: rgba(255,255,255,.55); line-height: 1.8; max-width: 270px; }
-
-.zs-foot-col h5 {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 4px; text-transform: uppercase;
-  color: rgba(255,255,255,.5); margin-bottom: 26px;
-}
-.zs-foot-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
-.zs-foot-col a {
-  font-size: .84rem; font-weight: 400; color: rgba(255,255,255,.45);
-  text-decoration: none; transition: color .3s;
-}
-.zs-foot-col a:hover { color: #fff; }
-
-.zs-foot-bot {
-  display: flex; justify-content: space-between; align-items: center;
-  padding-top: 36px; border-top: 1px solid rgba(255,255,255,.06);
-}
-.zs-foot-copy {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,.45);
-}
-.zs-foot-right { display: flex; align-items: center; gap: 2px; }
-.zs-foot-soc {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase;
-  color: rgba(255,255,255,.45); text-decoration: none;
-  border: 1px solid rgba(255,255,255,.25); padding: 10px 16px;
-  transition: color .3s, border-color .3s;
-}
-.zs-foot-soc:hover { color: var(--gold); border-color: var(--gold); }
-
-/* ── ANIMATIONS ── */
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(36px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* ─────────────────────────────── LOADER ─────────────────────────────── */
-#zs-loader {
-  position: fixed; inset: 0; z-index: 10000;
-  background: #000;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 32px;
-  transition: opacity .7s ease, visibility .7s ease;
-}
-#zs-loader.hide { opacity: 0; visibility: hidden; }
-
-.zs-loader-logo {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2.8rem, 8vw, 6rem);
-  letter-spacing: 14px; text-transform: uppercase;
-  color: #fff; overflow: hidden;
-}
-.zs-loader-logo em { color: #CC0000; font-style: normal; }
-.zs-loader-logo span {
-  display: inline-block;
-  animation: loaderLetterIn .7s cubic-bezier(.16,1,.3,1) forwards;
-  opacity: 0; transform: translateY(60px);
-}
-.zs-loader-logo span:nth-child(1)  { animation-delay: .05s; }
-.zs-loader-logo span:nth-child(2)  { animation-delay: .10s; }
-.zs-loader-logo span:nth-child(3)  { animation-delay: .15s; }
-.zs-loader-logo span:nth-child(4)  { animation-delay: .22s; }
-.zs-loader-logo span:nth-child(5)  { animation-delay: .28s; }
-.zs-loader-logo span:nth-child(6)  { animation-delay: .34s; }
-@keyframes loaderLetterIn {
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.zs-loader-bar-wrap {
-  width: min(320px, 70vw); height: 1px;
-  background: rgba(255,255,255,.12); position: relative; overflow: hidden;
-}
-.zs-loader-bar-fill {
-  position: absolute; top: 0; left: 0; height: 100%;
-  background: #CC0000;
-  animation: loaderFill 1.8s cubic-bezier(.4,0,.2,1) forwards;
-}
-@keyframes loaderFill {
-  from { width: 0%; }
-  to   { width: 100%; }
-}
-
-.zs-loader-tag {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 5px; text-transform: uppercase;
-  color: rgba(255,255,255,.3);
-  animation: fadeIn .6s ease .9s both;
-}
-
-/* ─────────────────────────────── MOBILE MENU ─────────────────────────────── */
-.zs-hamburger {
-  display: none;
-  flex-direction: column; gap: 5px;
-  background: none; border: none;
-  padding: 8px; z-index: 601;
-}
-.zs-hamburger span {
-  display: block; width: 24px; height: 1.5px;
-  background: var(--text);
-  transition: transform .4s cubic-bezier(.16,1,.3,1),
-              opacity .3s ease, background .3s;
-}
-.zs-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
-.zs-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.zs-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
-
-.zs-mobile-menu {
-  display: none;
-  position: fixed; inset: 0; z-index: 599;
-  background: rgba(255,255,255,.98);
-  backdrop-filter: blur(24px);
-  flex-direction: column; align-items: center; justify-content: center;
-  gap: 0;
-  opacity: 0; visibility: hidden;
-  transition: opacity .45s cubic-bezier(.16,1,.3,1), visibility .45s;
-}
-.zs-mobile-menu.open { opacity: 1; visibility: visible; }
-
-.zs-mob-link {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2rem, 8vw, 3.5rem);
-  letter-spacing: -1px; text-transform: uppercase;
-  color: #000; text-decoration: none;
-  padding: 18px 0; border-bottom: 1px solid rgba(0,0,0,.07);
-  width: min(400px, 80vw); text-align: center;
-  opacity: 0; transform: translateY(20px);
-  transition: color .25s, opacity .5s cubic-bezier(.16,1,.3,1), transform .5s cubic-bezier(.16,1,.3,1);
-}
-.zs-mobile-menu.open .zs-mob-link { opacity: 1; transform: translateY(0); }
-.zs-mobile-menu.open .zs-mob-link:nth-child(1) { transition-delay: .08s; }
-.zs-mobile-menu.open .zs-mob-link:nth-child(2) { transition-delay: .14s; }
-.zs-mobile-menu.open .zs-mob-link:nth-child(3) { transition-delay: .20s; }
-.zs-mobile-menu.open .zs-mob-link:nth-child(4) { transition-delay: .26s; }
-.zs-mobile-menu.open .zs-mob-link:nth-child(5) { transition-delay: .32s; }
-.zs-mob-link:hover { color: var(--gold); }
-.zs-mob-link:last-child { border-bottom: none; }
-
-.zs-mob-cta {
-  margin-top: 40px;
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .75rem; letter-spacing: 4px; text-transform: uppercase;
-  background: var(--gold); color: #fff;
-  border: none; padding: 18px 52px;
-  opacity: 0; transform: translateY(20px);
-  transition: opacity .5s cubic-bezier(.16,1,.3,1) .4s,
-              transform .5s cubic-bezier(.16,1,.3,1) .4s, box-shadow .3s;
-}
-.zs-mobile-menu.open .zs-mob-cta { opacity: 1; transform: translateY(0); }
-.zs-mob-cta:hover { box-shadow: 0 0 44px rgba(204,0,0,.4); }
-
-/* ─────────────────────────────── ENHANCED CARD HOVERS ─────────────────────────────── */
-.zs-saas-card {
-  background: var(--void);
-  border: 1px solid var(--edge);
-  padding: 52px 44px;
-  position: relative; overflow: hidden;
-  transition: border-color .45s, transform .45s cubic-bezier(.16,1,.3,1), box-shadow .45s;
-}
-.zs-saas-card:hover {
-  border-color: var(--edge-g);
-  transform: translateY(-10px);
-  box-shadow: 0 28px 60px rgba(204,0,0,.09), 0 8px 20px rgba(0,0,0,.06);
-}
-.zs-saas-card .zs-saas-icon { transition: transform .5s cubic-bezier(.16,1,.3,1); }
-.zs-saas-card:hover .zs-saas-icon { transform: scale(1.2) rotate(-6deg); }
-
-.zs-case {
-  display: grid; grid-template-columns: 1fr 260px;
-  gap: 80px; align-items: start;
-  background: var(--void); border: 1px solid transparent;
-  padding: 64px 72px;
-  position: relative; overflow: hidden;
-  transition: background .45s, border-color .45s,
-              transform .45s cubic-bezier(.16,1,.3,1), box-shadow .45s;
-}
-.zs-case:hover {
-  background: var(--surface); border-color: var(--edge-g);
-  transform: translateX(6px);
-  box-shadow: -6px 0 0 0 var(--gold), 0 12px 40px rgba(0,0,0,.06);
-}
-
-/* ─────────────────────────────── CONTACT FORM ─────────────────────────────── */
-.zs-form-wrap {
-  margin-top: 88px;
-  background: var(--void);
-  border: 1px solid var(--edge);
-  padding: 72px 80px;
-  position: relative; overflow: hidden;
-}
-.zs-form-wrap::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--gold), rgba(204,0,0,.15));
-}
-.zs-form-title {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.5rem; letter-spacing: -0.5px;
-  margin-bottom: 8px; color: #000;
-}
-.zs-form-sub {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 3px; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 52px;
-}
-.zs-form-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 20px; margin-bottom: 20px;
-}
-.zs-field { display: flex; flex-direction: column; gap: 8px; }
-.zs-field.full { grid-column: 1 / -1; }
-.zs-field label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase; color: #444;
-}
-.zs-field input, .zs-field select, .zs-field textarea {
-  background: var(--ink);
-  border: 1px solid var(--edge);
-  padding: 16px 20px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: .9rem; color: #000;
-  outline: none;
-  transition: border-color .3s, background .3s;
-  appearance: none; -webkit-appearance: none;
-}
-.zs-field input::placeholder, .zs-field textarea::placeholder { color: #aaa; }
-.zs-field input:focus, .zs-field select:focus, .zs-field textarea:focus {
-  border-color: var(--gold); background: #fff;
-}
-.zs-field textarea { min-height: 130px; resize: vertical; }
-.zs-field select { cursor: pointer; background-image: none; }
-
-.zs-form-actions {
-  display: flex; align-items: center; gap: 24px; margin-top: 8px; flex-wrap: wrap;
-}
-.zs-btn-submit {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .7rem; letter-spacing: 3.5px; text-transform: uppercase;
-  background: var(--gold); color: #fff;
-  border: none; padding: 20px 56px;
-  position: relative; overflow: hidden;
-  transition: box-shadow .35s;
-}
-.zs-btn-submit::after {
-  content: ''; position: absolute; inset: 0;
-  background: rgba(255,255,255,.18);
-  transform: translateX(-101%);
-  transition: transform .38s cubic-bezier(.16,1,.3,1);
-}
-.zs-btn-submit:hover::after { transform: translateX(0); }
-.zs-btn-submit:hover { box-shadow: 0 0 52px rgba(204,0,0,.4); }
-.zs-btn-submit:disabled { opacity: .6; }
-
-.zs-form-note {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2px; color: #888;
-}
-.zs-form-success {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 18px; padding: 60px 0; text-align: center;
-}
-.zs-form-success-icon {
-  width: 56px; height: 56px; border-radius: 50%;
-  background: var(--gold);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.5rem;
-  animation: successPop .6s cubic-bezier(.16,1,.3,1) forwards;
-}
-@keyframes successPop {
-  from { transform: scale(0); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
-}
-.zs-form-success h3 {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.6rem; color: #000; letter-spacing: -0.5px;
-}
-.zs-form-success p { font-size: .88rem; color: #444; max-width: 320px; line-height: 1.7; }
-
-/* ─────────────────────────────── RESPONSIVE ─────────────────────────────── */
-@media (max-width: 1100px) {
-  .zs-nav, .zs-nav.stuck { padding: 18px 28px; }
-  .zs-nav-links { display: none; }
-  .zs-hamburger { display: flex; }
-  .zs-mobile-menu { display: flex; }
-  .zs-live { display: none; }
-  .zs-sect { padding: 100px 28px; }
-  .zs-hero-body { padding: 0 28px; }
-  .zs-hero-aside,.zs-scroll { display: none; }
-  .zs-cap-hd,.zs-saas-hd,.zs-proc-hd { grid-template-columns: 1fr; gap: 48px; }
-  .zs-row { grid-template-columns: 48px 1fr; padding: 38px 28px; gap: 24px; }
-  .zs-row-arr { display: none; }
-  .zs-saas-grid { grid-template-columns: 1fr; }
-  .zs-work-hd { flex-direction: column; align-items: flex-start; }
-  .zs-work-note { text-align: left; }
-  .zs-case { grid-template-columns: 1fr; padding: 48px 28px; gap: 40px; }
-  .zs-case-n { display: none; }
-  .zs-phase { grid-template-columns: 70px 1fr; gap: 28px; }
-  .zs-phase-dur { display: none; }
-  .zs-man-inner { grid-template-columns: 1fr; gap: 60px; }
-  .zs-cg { grid-template-columns: 1fr; }
-  .zs-contact-cta { flex-direction: column; align-items: flex-start; gap: 40px; padding: 52px 40px; }
-  .zs-foot-top { grid-template-columns: 1fr 1fr; gap: 56px; }
-  .zs-footer { padding: 72px 28px 52px; }
-  .zs-form-wrap { padding: 48px 28px; }
-  .zs-form-grid { grid-template-columns: 1fr; }
-  .zs-field.full { grid-column: 1; }
-}
-@media (max-width: 640px) {
-  .zs-h1 { font-size: clamp(3.2rem,16vw,5rem); letter-spacing: -2.5px; }
-  .zs-sh { letter-spacing: -1.5px; }
-  .zs-row { grid-template-columns: 1fr; }
-  .zs-row-n,.zs-row-arr { display: none; }
-  .zs-foot-top { grid-template-columns: 1fr; }
-  .zs-foot-bot { flex-direction: column; gap: 24px; }
-  .zs-cc { padding: 40px 28px; }
-}
-
-/* ─────────────────────────────── PRICING ─────────────────────────────── */
-.zs-pricing { background: var(--void); }
-
-.zs-pricing-hd {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 110px; align-items: end; margin-bottom: 88px;
-}
-.zs-pricing-note { font-size: .93rem; font-weight: 400; color: #222; line-height: 1.88; }
-.zs-pricing-note strong { color: #000; font-weight: 700; }
-
-.zs-pricing-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 16px; align-items: start;
-}
-
-.zs-price-card {
-  background: var(--surface);
-  border: 1px solid var(--edge);
-  padding: 52px 44px 48px;
-  position: relative; overflow: hidden;
-  transition: border-color .45s, transform .45s cubic-bezier(.16,1,.3,1), box-shadow .45s;
-}
-.zs-price-card:hover {
-  border-color: var(--edge-g);
-  transform: translateY(-9px);
-  box-shadow: 0 28px 64px rgba(204,0,0,.07);
-}
-.zs-price-card::after {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--gold), rgba(204,0,0,.2));
-  transform: scaleX(0); transform-origin: left;
-  transition: transform .55s cubic-bezier(.16,1,.3,1);
-}
-.zs-price-card:hover::after { transform: scaleX(1); }
-.zs-price-card::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse 65% 45% at 50% 0%, rgba(204,0,0,.032), transparent 60%);
-  opacity: 0; transition: opacity .45s;
-}
-.zs-price-card:hover::before { opacity: 1; }
-
-.zs-price-card.featured {
-  background: var(--void);
-  border-color: rgba(204,0,0,.22);
-  padding-top: 44px;
-}
-.zs-price-card.featured::after { transform: scaleX(1); }
-
-.zs-price-featured-tag {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .48rem; letter-spacing: 3px; text-transform: uppercase;
-  color: #fff; background: var(--gold);
-  padding: 5px 14px; margin-bottom: 36px;
-}
-.zs-price-featured-tag::before {
-  content: ''; width: 4px; height: 4px; border-radius: 50%;
-  background: rgba(255,255,255,.7);
-  animation: livePulse 2s ease infinite;
-}
-
-.zs-price-tier {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 3.5px; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 18px;
-}
-
-.zs-price-amount {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2.6rem, 4vw, 3.6rem);
-  line-height: 1; letter-spacing: -2px;
-  color: var(--text); margin-bottom: 6px;
-}
-.zs-price-amount sup {
-  font-size: .42em; letter-spacing: 0;
-  vertical-align: super; font-weight: 700; color: var(--gold);
-}
-
-.zs-price-name {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.05rem; letter-spacing: .5px;
-  color: var(--text); margin-bottom: 8px; margin-top: 22px;
-  text-transform: uppercase;
-}
-
-.zs-price-desc {
-  font-size: .83rem; font-weight: 400; color: #444;
-  line-height: 1.75; margin-bottom: 34px;
-  border-bottom: 1px solid var(--edge); padding-bottom: 28px;
-}
-
-.zs-price-features { display: flex; flex-direction: column; gap: 13px; margin-bottom: 44px; }
-.zs-price-feat {
-  display: flex; align-items: flex-start; gap: 14px;
-  font-size: .82rem; font-weight: 400; color: #222; line-height: 1.55;
-}
-.zs-price-feat strong { font-weight: 700; color: #000; }
-.zs-price-feat-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--gold); flex-shrink: 0; margin-top: 7px;
-}
-
-.zs-price-slots {
-  display: flex; align-items: center; gap: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2.5px; text-transform: uppercase;
-  color: var(--gold); font-weight: 700;
-  background: var(--gold-lo); border: 1px solid rgba(204,0,0,.13);
-  padding: 8px 14px; margin-top: 20px;
-}
-.zs-price-slots::before {
-  content: ''; width: 5px; height: 5px; border-radius: 50%;
-  background: var(--gold); flex-shrink: 0;
-  animation: livePulse 2.5s ease infinite;
-}
-
-.zs-price-btn {
-  width: 100%;
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .68rem; letter-spacing: 3.5px; text-transform: uppercase;
-  padding: 16px 28px; border: none;
-  position: relative; overflow: hidden;
-  transition: box-shadow .35s;
-}
-.zs-price-btn.solid { background: var(--gold); color: #fff; }
-.zs-price-btn.solid::after {
-  content: ''; position: absolute; inset: 0;
-  background: rgba(255,255,255,.18);
-  transform: translateX(-101%);
-  transition: transform .38s cubic-bezier(.16,1,.3,1);
-}
-.zs-price-btn.solid:hover::after { transform: translateX(0); }
-.zs-price-btn.solid:hover { box-shadow: 0 0 52px rgba(204,0,0,.38); }
-.zs-price-btn.outline { background: transparent; color: var(--text); border: 1px solid rgba(0,0,0,.14); }
-.zs-price-btn.outline:hover { border-color: rgba(204,0,0,.38); color: var(--gold); }
-
-@media (max-width: 900px) {
-  .zs-pricing-grid { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
-  .zs-pricing-hd { grid-template-columns: 1fr; gap: 32px; }
-}
-
-/* ─────────────────────────────── HERO URGENCY ─────────────────────────────── */
-.zs-hero-urgency {
-  display: flex; align-items: center; gap: 12px; margin-top: 24px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .54rem; letter-spacing: 2px; color: #222;
-  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) .82s forwards;
-}
-.zs-hero-urgency strong { color: var(--gold); }
-.zs-hero-urgency-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--gold); flex-shrink: 0;
-  animation: livePulse 2s ease infinite;
-}
-
-/* ─────────────────────────────── AUTOPILOT CTA ─────────────────────────────── */
-.zs-autopilot-cta {
-  margin-top: 88px;
-  background: var(--text);
-  padding: 80px 88px;
-  position: relative; overflow: hidden;
-}
-.zs-autopilot-cta::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse 55% 70% at 10% 50%, rgba(204,0,0,.18), transparent 60%);
-  pointer-events: none;
-}
-.zs-autopilot-inner { position: relative; z-index: 1; max-width: 680px; }
-.zs-autopilot-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 4px; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 22px;
-  display: flex; align-items: center; gap: 12px;
-}
-.zs-autopilot-label::before { content: ''; width: 20px; height: 1px; background: var(--gold); }
-.zs-autopilot-h {
-  font-family: 'ST Tokyo', 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2.2rem, 4.5vw, 4.5rem);
-  line-height: 1.0; letter-spacing: -2px;
-  color: #fff; margin-bottom: 24px;
-}
-.zs-autopilot-h em { color: var(--gold); font-style: normal; }
-.zs-autopilot-sub {
-  font-size: .92rem; font-weight: 400; color: rgba(255,255,255,.68);
-  line-height: 1.85; max-width: 520px; margin-bottom: 8px;
-}
-@media (max-width: 768px) {
-  .zs-autopilot-cta { padding: 60px 28px; }
-}
-
-/* ─────────────────────────────── PAIN SECTION ─────────────────────────────── */
-.zs-pain { background: #0a0a0a; position: relative; overflow: hidden; }
-.zs-pain::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse 60% 50% at 50% 100%, rgba(204,0,0,.12), transparent 60%);
-}
-.zs-pain-inner { max-width: 1280px; margin: 0 auto; position: relative; z-index: 1; }
-.zs-pain-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 2px; margin-top: 72px;
-}
-.zs-pain-item {
-  background: rgba(255,255,255,.03);
-  border: 1px solid rgba(255,255,255,.06);
-  padding: 48px 40px;
-  position: relative; overflow: hidden;
-  transition: background .4s, border-color .4s;
-}
-.zs-pain-item:hover {
-  background: rgba(204,0,0,.06);
-  border-color: rgba(204,0,0,.18);
-}
-.zs-pain-item::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 2px;
-  background: var(--gold); transform: scaleX(0); transform-origin: left;
-  transition: transform .5s cubic-bezier(.16,1,.3,1);
-}
-.zs-pain-item:hover::before { transform: scaleX(1); }
-.zs-pain-icon { font-size: 1.8rem; margin-bottom: 24px; display: block; }
-.zs-pain-title {
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .95rem; color: #fff; margin-bottom: 12px; line-height: 1.3;
-}
-.zs-pain-desc { font-size: .83rem; color: rgba(255,255,255,.5); line-height: 1.78; }
-.zs-pain-desc strong { color: rgba(204,0,0,.85); font-weight: 600; }
-
-.zs-pain-banner {
-  margin-top: 64px;
-  background: rgba(204,0,0,.08);
-  border: 1px solid rgba(204,0,0,.2);
-  padding: 48px 60px;
-  display: flex; align-items: center; justify-content: space-between; gap: 60px;
-}
-.zs-pain-banner-txt {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(1.4rem, 3vw, 2.4rem);
-  color: #fff; line-height: 1.15; letter-spacing: -1px;
-}
-.zs-pain-banner-txt em { color: var(--gold); font-style: normal; }
-.zs-pain-banner-sub {
-  font-size: .84rem; color: rgba(255,255,255,.5);
-  line-height: 1.75; max-width: 340px; margin-top: 10px;
-}
-@media (max-width: 900px) {
-  .zs-pain-grid { grid-template-columns: 1fr; }
-  .zs-pain-banner { flex-direction: column; align-items: flex-start; padding: 40px 28px; }
-}
-
-/* ─────────────────────────────── GRAPH SECTION ─────────────────────────────── */
-.zs-graph { background: var(--void); }
-.zs-graph-inner { max-width: 1280px; margin: 0 auto; }
-.zs-graph-panels {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 2px; margin-top: 80px;
-}
-.zs-graph-panel {
-  padding: 64px 60px;
-  background: var(--surface);
-  border: 1px solid var(--edge);
-  position: relative; overflow: hidden;
-}
-.zs-graph-panel.active {
-  background: var(--void);
-  border-color: rgba(204,0,0,.2);
-}
-.zs-graph-panel.active::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 3px;
-  background: var(--gold);
-}
-.zs-graph-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 4px; text-transform: uppercase;
-  margin-bottom: 36px; display: flex; align-items: center; gap: 12px;
-}
-.zs-graph-label.bad { color: #888; }
-.zs-graph-label.good { color: var(--gold); }
-.zs-graph-label-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-}
-.zs-graph-label.bad .zs-graph-label-dot { background: #888; }
-.zs-graph-label.good .zs-graph-label-dot { background: var(--gold); animation: livePulse 2s ease infinite; }
-
-.zs-bar-row { margin-bottom: 28px; }
-.zs-bar-meta {
-  display: flex; justify-content: space-between; align-items: baseline;
-  margin-bottom: 9px;
-}
-.zs-bar-key {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2.5px; text-transform: uppercase; color: #666;
-}
-.zs-bar-val {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.1rem; color: var(--text);
-}
-.zs-bar-val.red { color: var(--gold); }
-.zs-bar-track {
-  height: 6px; background: var(--lift); position: relative; overflow: hidden;
-}
-.zs-bar-fill {
-  height: 100%; background: #ccc;
-  transition: width 1.4s cubic-bezier(.16,1,.3,1);
-}
-.zs-bar-fill.red { background: var(--gold); }
-
-.zs-graph-caption {
-  margin-top: 40px; padding-top: 28px;
-  border-top: 1px solid var(--edge);
-  font-size: .83rem; color: #444; line-height: 1.75;
-}
-.zs-graph-caption strong { color: #000; font-weight: 700; }
-
-.zs-conversion-block {
-  margin-top: 2px;
-  background: #0a0a0a;
-  padding: 80px 88px;
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 100px; align-items: center;
-}
-.zs-conv-side {}
-.zs-conv-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 4px; text-transform: uppercase;
-  color: rgba(255,255,255,.4); margin-bottom: 28px;
-}
-.zs-conv-flow { display: flex; flex-direction: column; gap: 0; }
-.zs-conv-step {
-  display: flex; align-items: center; gap: 16px;
-  padding: 18px 0;
-}
-.zs-conv-step-num {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.8rem; min-width: 80px; line-height: 1;
-}
-.zs-conv-step-num.dim { color: rgba(255,255,255,.25); }
-.zs-conv-step-num.bright { color: var(--gold); }
-.zs-conv-step-lbl {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 2.5px; text-transform: uppercase;
-  color: rgba(255,255,255,.45); line-height: 1.6;
-}
-.zs-conv-arrow {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.4rem; color: rgba(255,255,255,.12);
-  padding: 0 0 0 80px;
-}
-.zs-conv-result {
-  margin-top: 20px;
-  background: rgba(204,0,0,.08);
-  border: 1px solid rgba(204,0,0,.2);
-  padding: 20px 24px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 2.5px; text-transform: uppercase;
-}
-.zs-conv-result.dim { color: rgba(255,255,255,.3); border-color: rgba(255,255,255,.06); background: rgba(255,255,255,.02); }
-.zs-conv-result.bright { color: var(--gold); }
-.zs-conv-hero-txt {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2.4rem, 4.5vw, 4.8rem);
-  color: #fff; line-height: .95; letter-spacing: -2px;
-  margin-bottom: 28px;
-}
-.zs-conv-hero-txt em { color: var(--gold); font-style: normal; }
-.zs-conv-sub { font-size: .88rem; color: rgba(255,255,255,.5); line-height: 1.82; max-width: 400px; }
-.zs-conv-sub strong { color: #fff; font-weight: 700; }
-@media (max-width: 900px) {
-  .zs-graph-panels { grid-template-columns: 1fr; }
-  .zs-conversion-block { grid-template-columns: 1fr; gap: 60px; padding: 60px 28px; }
-}
-
-/* ─────────────────────────────── ROI SECTION ─────────────────────────────── */
-.zs-roi { background: var(--ink); position: relative; }
-.zs-roi-inner { max-width: 1280px; margin: 0 auto; }
-.zs-roi-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 88px; align-items: center; margin-top: 72px;
-}
-.zs-roi-calc {
-  background: var(--void);
-  border: 1px solid var(--edge);
-  padding: 60px 52px;
-  position: relative; overflow: hidden;
-}
-.zs-roi-calc::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 2px;
-  background: var(--gold);
-}
-.zs-roi-row {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding: 16px 0; border-bottom: 1px solid var(--edge);
-}
-.zs-roi-row:last-of-type { border-bottom: none; }
-.zs-roi-item {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 2.5px; text-transform: uppercase; color: #555;
-}
-.zs-roi-num {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.4rem; color: var(--text); letter-spacing: -0.5px;
-}
-.zs-roi-num.green { color: #16a34a; }
-.zs-roi-num.red { color: var(--gold); }
-.zs-roi-total {
-  margin-top: 28px; padding: 28px 32px;
-  background: var(--gold);
-  text-align: center;
-}
-.zs-roi-total-lbl {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase;
-  color: rgba(255,255,255,.7); margin-bottom: 8px;
-}
-.zs-roi-total-num {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2rem, 4vw, 3.5rem); color: #fff; letter-spacing: -2px; line-height: 1;
-}
-.zs-roi-side h3 {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(1.8rem, 3.5vw, 3rem);
-  color: var(--text); line-height: 1.1; letter-spacing: -1.5px;
-  margin-bottom: 24px;
-}
-.zs-roi-side h3 em { color: var(--gold); font-style: normal; }
-.zs-roi-side p { font-size: .9rem; color: #333; line-height: 1.85; margin-bottom: 20px; }
-.zs-roi-side p strong { color: #000; font-weight: 700; }
-.zs-roi-bullets { display: flex; flex-direction: column; gap: 14px; margin-top: 32px; }
-.zs-roi-bullet {
-  display: flex; align-items: flex-start; gap: 14px;
-  font-size: .84rem; color: #222; line-height: 1.6;
-}
-.zs-roi-bullet-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--gold); flex-shrink: 0; margin-top: 8px;
-}
-@media (max-width: 900px) {
-  .zs-roi-grid { grid-template-columns: 1fr; }
-}
-/* ─────────────────────────────── HERO TRUST STRIP ─────────────────────────────── */
-.zs-hero-trust {
-  display: flex; align-items: center; gap: 14px; margin-top: 28px; flex-wrap: wrap;
-  opacity: 0; animation: slideUp .95s cubic-bezier(.16,1,.3,1) 1s forwards;
-}
-.zs-htrust-stars {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .52rem; letter-spacing: 1.5px; color: #333;
-}
-.zs-htrust-stars span { color: var(--gold); font-weight: 700; }
-.zs-htrust-sep { color: #bbb; font-size: .7rem; }
-.zs-htrust-item {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 2px; text-transform: uppercase; color: #444;
-}
-
-/* ─────────────────────────────── STATS COUNTER ─────────────────────────────── */
-.zs-stats {
-  background: var(--gold); position: relative; overflow: hidden;
-  padding: 72px 88px;
-}
-.zs-stats::before {
-  content: 'ZENSHA'; position: absolute;
-  right: -10px; top: 50%; transform: translateY(-50%);
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 20rem; color: rgba(0,0,0,.05);
-  line-height: 1; pointer-events: none; letter-spacing: -8px;
-}
-.zs-stats-grid {
-  max-width: 1280px; margin: 0 auto;
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 0; position: relative; z-index: 1;
-}
-.zs-stat {
-  padding: 28px 40px;
-  border-right: 1px solid rgba(255,255,255,.2);
-  display: flex; flex-direction: column; gap: 6px;
-}
-.zs-stat:first-child { padding-left: 0; }
-.zs-stat:last-child { border-right: none; }
-.zs-stat-num {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(2.4rem, 4vw, 3.8rem);
-  color: #fff; line-height: 1; letter-spacing: -2px;
-}
-.zs-stat-lbl {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 3px; text-transform: uppercase;
-  color: rgba(255,255,255,.65);
-}
-.zs-stat-sub {
-  font-size: .78rem; color: rgba(255,255,255,.55); line-height: 1.5; margin-top: 4px;
-}
-@media (max-width: 900px) {
-  .zs-stats { padding: 60px 28px; }
-  .zs-stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .zs-stat { border-right: none; border-bottom: 1px solid rgba(255,255,255,.15); padding: 28px 0; }
-  .zs-stat:nth-child(2n) { padding-left: 28px; }
-}
-
-
-/* ─────────────────────────────── FAQ SECTION ─────────────────────────────── */
-.zs-faq { background: var(--void); }
-.zs-faq-inner { max-width: 1280px; margin: 0 auto; }
-.zs-faq-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 110px; margin-top: 80px; align-items: start;
-}
-.zs-faq-list { display: flex; flex-direction: column; gap: 2px; }
-.zs-faq-item {
-  border: 1px solid var(--edge);
-  background: var(--surface);
-  overflow: hidden;
-  transition: border-color .35s;
-}
-.zs-faq-item.open { border-color: rgba(204,0,0,.2); }
-.zs-faq-q {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 24px; padding: 26px 32px;
-  font-family: 'Syne', sans-serif; font-weight: 700;
-  font-size: .88rem; color: #000; line-height: 1.4;
-  cursor: pointer;
-  transition: color .3s;
-}
-.zs-faq-item.open .zs-faq-q { color: var(--gold); }
-.zs-faq-icon {
-  font-family: 'JetBrains Mono', monospace; font-weight: 700;
-  font-size: 1.2rem; color: #999; flex-shrink: 0;
-  transition: transform .35s cubic-bezier(.16,1,.3,1), color .3s;
-}
-.zs-faq-item.open .zs-faq-icon { transform: rotate(45deg); color: var(--gold); }
-.zs-faq-a {
-  max-height: 0; overflow: hidden;
-  transition: max-height .45s cubic-bezier(.16,1,.3,1), padding .35s;
-  padding: 0 32px;
-}
-.zs-faq-item.open .zs-faq-a { max-height: 300px; padding: 0 32px 26px; }
-.zs-faq-a p { font-size: .86rem; color: #444; line-height: 1.82; }
-.zs-faq-a strong { color: #000; font-weight: 700; }
-
-.zs-faq-cta-side {
-  position: sticky; top: 120px;
-  background: #0a0a0a;
-  padding: 60px 52px;
-  position: relative; overflow: hidden;
-}
-.zs-faq-cta-side::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(204,0,0,.18), transparent 55%);
-}
-.zs-faq-cta-inner { position: relative; z-index: 1; }
-.zs-faq-cta-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: .5rem; letter-spacing: 4px; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 20px;
-  display: flex; align-items: center; gap: 10px;
-}
-.zs-faq-cta-label::before { content: ''; width: 16px; height: 1px; background: var(--gold); }
-.zs-faq-cta-h {
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: clamp(1.6rem, 2.8vw, 2.4rem);
-  color: #fff; line-height: 1.05; letter-spacing: -1px;
-  margin-bottom: 18px;
-}
-.zs-faq-cta-h em { color: var(--gold); font-style: normal; }
-.zs-faq-cta-sub { font-size: .84rem; color: rgba(255,255,255,.5); line-height: 1.8; margin-bottom: 32px; }
-.zs-faq-cta-promise {
-  display: flex; flex-direction: column; gap: 11px; margin-bottom: 36px;
-}
-.zs-faq-promise-row {
-  display: flex; align-items: center; gap: 12px;
-  font-size: .82rem; color: rgba(255,255,255,.65);
-}
-.zs-faq-promise-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--gold); flex-shrink: 0;
-}
-@media (max-width: 900px) {
-  .zs-faq-grid { grid-template-columns: 1fr; gap: 52px; }
-  .zs-faq-cta-side { position: static; }
-}
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ZENSHA — AI Revenue Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  /* NEW PALETTE: Navy Blue · Grey · Black · White · Red */
+  --void:#05070d;            /* near-black with navy hint */
+  --deep:#0a1020;            /* deep navy */
+  --navy:#101a33;            /* navy blue */
+  --navy-2:#162447;          /* lighter navy */
+  --surface:#1a1f2e;         /* dark grey-blue */
+  --lift:#222838;            /* lifted grey */
+  --grey:#2a3142;            /* mid grey */
+  --grey-lt:#3d4456;         /* lighter grey */
+  --red:#e8001a;
+  --red-glow:rgba(232,0,26,.18);
+  --red-lo:rgba(232,0,26,.06);
+  --red-hi:rgba(232,0,26,.55);
+  --white:#f4f6fa;
+  --muted:rgba(244,246,250,.55);
+  --dim:rgba(244,246,250,.28);
+  --edge:rgba(180,200,230,.09);
+  --edge-b:rgba(80,120,200,.22);   /* navy edge */
+  --edge-r:rgba(232,0,26,.22);
+  --font-display:'Bebas Neue',sans-serif;
+  --font-body:'Outfit',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--void);color:var(--white);font-family:var(--font-body);overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+::selection{background:var(--red);color:#fff;}
+
+#site-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;}
+
+@media(hover:hover){
+  *{cursor:none!important;}
+  #cur-dot{position:fixed;width:6px;height:6px;background:var(--red);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:width .12s,height .12s,opacity .15s;will-change:left,top;}
+  #cur-ring{position:fixed;width:28px;height:28px;border:1px solid rgba(232,0,26,.5);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .3s cubic-bezier(.16,1,.3,1),height .3s cubic-bezier(.16,1,.3,1);will-change:left,top;}
+  body:has(a:hover) #cur-ring,body:has(button:hover) #cur-ring{width:48px;height:48px;}
+}
+@media(hover:none){#cur-dot,#cur-ring{display:none;}}
+
+#zs-bar{position:fixed;top:0;left:0;height:2px;width:0%;background:linear-gradient(90deg,var(--red),#ff4444);z-index:800;box-shadow:0 0 12px var(--red-hi);transition:width .08s linear;}
+
+/* LOADER */
+#loader{position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#000 0%,var(--navy) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .8s ease,visibility .8s;}
+#loader.out{opacity:0;visibility:hidden;}
+.ld-logo{font-family:var(--font-display);font-size:clamp(3rem,9vw,7rem);letter-spacing:16px;color:#fff;overflow:hidden;}
+.ld-logo em{color:var(--red);font-style:normal;}
+.ld-logo span{display:inline-block;opacity:0;transform:translateY(60px);animation:ldIn .6s cubic-bezier(.16,1,.3,1) forwards;}
+.ld-logo span:nth-child(1){animation-delay:.04s}.ld-logo span:nth-child(2){animation-delay:.08s}.ld-logo span:nth-child(3){animation-delay:.12s}
+.ld-logo span:nth-child(4){animation-delay:.18s}.ld-logo span:nth-child(5){animation-delay:.23s}.ld-logo span:nth-child(6){animation-delay:.28s}
+@keyframes ldIn{to{opacity:1;transform:translateY(0)}}
+.ld-bar{width:min(280px,65vw);height:1px;background:rgba(255,255,255,.1);overflow:hidden;}
+.ld-fill{height:100%;background:var(--red);animation:ldFill 1.9s cubic-bezier(.4,0,.2,1) forwards;}
+@keyframes ldFill{from{width:0}to{width:100%}}
+.ld-sub{font-family:var(--font-mono);font-size:.48rem;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,.3);}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:600;display:flex;align-items:center;justify-content:space-between;padding:36px 80px;transition:padding .5s,background .5s,border-color .5s;border-bottom:1px solid transparent;}
+.nav.stuck{padding:16px 80px;background:rgba(10,16,32,.92);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-color:var(--edge-b);}
+.nav-logo{font-family:var(--font-display);font-size:1.6rem;letter-spacing:10px;color:#fff;text-decoration:none;}
+.nav-logo em{color:var(--red);font-style:normal;}
+.nav-links{display:flex;gap:44px;}
+.nav-links a{font-family:var(--font-mono);font-size:.5rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .3s;position:relative;}
+.nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:var(--red);transition:width .3s;}
+.nav-links a:hover{color:#fff;}.nav-links a:hover::after{width:100%;}
+.nav-cta{font-family:var(--font-mono);font-size:.52rem;letter-spacing:3px;text-transform:uppercase;background:var(--red);color:#fff;border:none;padding:12px 28px;position:relative;overflow:hidden;transition:box-shadow .3s;}
+.nav-cta::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.12);transform:translateX(-101%);transition:transform .35s cubic-bezier(.16,1,.3,1);}
+.nav-cta:hover::after{transform:translateX(0);}.nav-cta:hover{box-shadow:0 0 36px var(--red-hi);}
+
+.ham{display:none;flex-direction:column;gap:5px;background:none;border:none;padding:8px;z-index:601;}
+.ham span{display:block;width:22px;height:1.5px;background:#fff;transition:transform .35s,opacity .25s;}
+.ham.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg);}
+.ham.open span:nth-child(2){opacity:0;}
+.ham.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg);}
+.mob-menu{display:none;position:fixed;inset:0;z-index:599;background:rgba(10,16,32,.97);backdrop-filter:blur(24px);flex-direction:column;align-items:center;justify-content:center;gap:0;opacity:0;visibility:hidden;transition:opacity .4s,visibility .4s;}
+.mob-menu.open{opacity:1;visibility:visible;}
+.mob-link{font-family:var(--font-display);font-size:clamp(2.5rem,8vw,4rem);letter-spacing:4px;color:#fff;text-decoration:none;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06);width:min(380px,80vw);text-align:center;opacity:0;transform:translateY(18px);transition:color .25s,opacity .45s,transform .45s;}
+.mob-menu.open .mob-link{opacity:1;transform:translateY(0);}
+.mob-menu.open .mob-link:nth-child(1){transition-delay:.06s}.mob-menu.open .mob-link:nth-child(2){transition-delay:.11s}
+.mob-menu.open .mob-link:nth-child(3){transition-delay:.16s}.mob-menu.open .mob-link:nth-child(4){transition-delay:.21s}
+.mob-link:hover{color:var(--red);}
+
+/* HERO — now with 3D model showcase */
+.hero{position:relative;min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr;align-items:center;overflow:hidden;background:linear-gradient(135deg,var(--void) 0%,var(--deep) 60%,var(--navy) 100%);}
+#hero-canvas{position:absolute;inset:0;z-index:0;}
+.hero-veil{position:absolute;inset:0;z-index:1;background:linear-gradient(105deg,rgba(5,7,13,.85) 30%,rgba(5,7,13,.0) 100%),linear-gradient(to top,rgba(5,7,13,.98) 0%,transparent 22%),radial-gradient(ellipse 55% 65% at 78% 50%,rgba(232,0,26,.06),transparent 60%),radial-gradient(ellipse 50% 60% at 20% 30%,rgba(22,36,71,.4),transparent 60%);pointer-events:none;}
+.hero-body{position:relative;z-index:2;padding:120px 0 60px 80px;max-width:680px;will-change:transform;}
+.hero-eyebrow{display:flex;align-items:center;gap:16px;margin-bottom:44px;opacity:0;animation:slideUp .8s cubic-bezier(.16,1,.3,1) .25s forwards;}
+.hero-eyebrow-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 2.5s ease infinite;}
+.hero-eyebrow-txt{font-family:var(--font-mono);font-size:.5rem;letter-spacing:4px;text-transform:uppercase;color:var(--red);}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 var(--red-hi)}50%{box-shadow:0 0 0 6px transparent}}
+.hero-h1{font-family:var(--font-display);font-size:clamp(3rem,6.5vw,8rem);line-height:.92;letter-spacing:2px;color:#fff;margin-bottom:36px;opacity:0;animation:slideUp 1s cubic-bezier(.16,1,.3,1) .38s forwards;text-shadow:0 4px 40px rgba(232,0,26,.15);}
+.hero-h1 .red{color:var(--red);text-shadow:0 4px 50px rgba(232,0,26,.5);}
+.hero-h1 .outline{-webkit-text-stroke:1.5px rgba(255,255,255,.28);color:transparent;}
+.hero-h1 .navy{color:#7c92c4;}
+.hero-sub{font-size:1.05rem;font-weight:300;line-height:1.85;color:var(--muted);max-width:500px;margin-bottom:52px;opacity:0;animation:slideUp 1s cubic-bezier(.16,1,.3,1) .52s forwards;}
+.hero-sub strong{color:#fff;font-weight:600;}
+.hero-btns{display:flex;gap:14px;flex-wrap:wrap;opacity:0;animation:slideUp 1s cubic-bezier(.16,1,.3,1) .66s forwards;}
+.btn-primary{font-family:var(--font-mono);font-size:.56rem;letter-spacing:3.5px;text-transform:uppercase;background:var(--red);color:#fff;border:none;padding:18px 48px;position:relative;overflow:hidden;transition:box-shadow .35s;}
+.btn-primary::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.14);transform:translateX(-101%);transition:transform .38s cubic-bezier(.16,1,.3,1);}
+.btn-primary:hover::after{transform:translateX(0);}.btn-primary:hover{box-shadow:0 0 48px var(--red-hi);}
+.btn-ghost{font-family:var(--font-mono);font-size:.56rem;letter-spacing:3.5px;text-transform:uppercase;background:transparent;color:var(--muted);border:1px solid var(--edge-b);padding:18px 48px;transition:color .3s,border-color .3s,background .3s;}
+.btn-ghost:hover{color:#fff;border-color:var(--edge-r);background:rgba(232,0,26,.04);}
+
+/* 3D MODEL SHOWCASE */
+.hero-3d{position:relative;z-index:2;height:100vh;min-height:700px;display:flex;align-items:center;justify-content:center;padding:0 60px 0 0;opacity:0;animation:slideUp 1.2s cubic-bezier(.16,1,.3,1) .8s forwards;}
+.hero-3d-frame{position:relative;width:100%;max-width:560px;aspect-ratio:1;}
+#model-canvas{position:absolute;inset:0;width:100%;height:100%;}
+.hero-3d-ring{position:absolute;inset:-30px;border:1px solid var(--edge-b);border-radius:50%;animation:ringSpin 40s linear infinite;}
+.hero-3d-ring::before{content:'';position:absolute;top:-3px;left:50%;width:6px;height:6px;background:var(--red);border-radius:50%;box-shadow:0 0 12px var(--red);}
+.hero-3d-ring2{position:absolute;inset:-60px;border:1px dashed rgba(124,146,196,.18);border-radius:50%;animation:ringSpin 60s linear infinite reverse;}
+@keyframes ringSpin{to{transform:rotate(360deg);}}
+.hero-3d-corners{position:absolute;inset:-20px;pointer-events:none;}
+.hero-3d-corners::before,.hero-3d-corners::after{content:'';position:absolute;width:24px;height:24px;border-color:var(--red);border-style:solid;}
+.hero-3d-corners::before{top:0;left:0;border-width:1px 0 0 1px;}
+.hero-3d-corners::after{bottom:0;right:0;border-width:0 1px 1px 0;}
+.hero-3d-label{position:absolute;bottom:-50px;left:0;right:0;text-align:center;font-family:var(--font-mono);font-size:.5rem;letter-spacing:5px;text-transform:uppercase;color:var(--dim);}
+.hero-3d-label em{color:var(--red);font-style:normal;}
+
+.hero-scroll{position:absolute;left:80px;bottom:60px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;animation:fadeIn .9s ease 1.2s forwards;}
+.hero-scroll-line{width:1px;height:56px;background:linear-gradient(to bottom,var(--red),transparent);animation:scrollPulse 2.2s ease infinite;}
+@keyframes scrollPulse{0%{transform:scaleY(0);transform-origin:top;opacity:1}49%{transform:scaleY(1);transform-origin:top;opacity:1}50%{transform:scaleY(1);transform-origin:bottom;opacity:1}100%{transform:scaleY(0);transform-origin:bottom;opacity:0}}
+.hero-scroll-lbl{font-family:var(--font-mono);font-size:.44rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim);writing-mode:vertical-rl;transform:rotate(180deg);}
+@keyframes slideUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.ticker{background:var(--red);overflow:hidden;padding:12px 0;position:relative;z-index:2;}
+.ticker-track{display:inline-flex;white-space:nowrap;animation:tickRun 28s linear infinite;}
+.ticker-track:hover{animation-play-state:paused;}
+@keyframes tickRun{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tick-item{font-family:var(--font-mono);font-size:.55rem;letter-spacing:5px;text-transform:uppercase;color:#fff;padding:0 32px;}
+.tick-dot{color:rgba(255,255,255,.35);}
+
+.section{padding:140px 80px;position:relative;overflow:hidden;}
+.wrap{max-width:1280px;margin:0 auto;position:relative;z-index:2;}
+
+.section::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;}
+.problem::before{background:linear-gradient(to bottom,rgba(5,7,13,.94),rgba(10,16,32,.92));}
+.caps::before{background:linear-gradient(to bottom,rgba(10,16,32,.92),rgba(16,26,51,.85));}
+.benefits::before{background:linear-gradient(to bottom,rgba(16,26,51,.88),rgba(10,16,32,.92));}
+.results::before{background:linear-gradient(to bottom,rgba(10,16,32,.9),rgba(5,7,13,.94));}
+.process::before{background:linear-gradient(to bottom,rgba(5,7,13,.94),rgba(16,26,51,.88));}
+.faq::before{background:linear-gradient(to bottom,rgba(16,26,51,.88),rgba(10,16,32,.94));}
+.contact::before{background:linear-gradient(to bottom,rgba(10,16,32,.92),rgba(5,7,13,.95));}
+
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:24px;}
+.eyebrow-num{font-family:var(--font-mono);font-size:.48rem;letter-spacing:2px;color:var(--dim);}
+.eyebrow-line{width:1px;height:16px;background:rgba(255,255,255,.15);}
+.eyebrow-txt{font-family:var(--font-mono);font-size:.48rem;letter-spacing:4px;text-transform:uppercase;color:var(--dim);}
+.eyebrow-dot{width:4px;height:4px;border-radius:50%;background:var(--red);}
+.section-h{font-family:var(--font-display);font-size:clamp(3rem,6vw,7.5rem);line-height:.9;letter-spacing:1px;color:#fff;}
+.section-h em{color:var(--red);font-style:normal;}
+.section-h .dim-txt{color:rgba(255,255,255,.22);}
+.section-h .navy-txt{color:#7c92c4;}
+
+.rev{opacity:0;transform:translateY(32px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1);}
+.rev.vis{opacity:1;transform:translateY(0);}
+.rev.d1{transition-delay:.07s}.rev.d2{transition-delay:.18s}.rev.d3{transition-delay:.29s}
+.rev.d4{transition-delay:.40s}.rev.d5{transition-delay:.51s}.rev.d6{transition-delay:.62s}
+
+/* PROBLEM */
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-top:72px;perspective:1400px;}
+.problem-card{background:linear-gradient(145deg,rgba(16,26,51,.7),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:52px 44px;position:relative;overflow:hidden;transition:border-color .4s,background .4s;transform-style:preserve-3d;will-change:transform;}
+.problem-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--red);transform:scaleX(0);transform-origin:left;transition:transform .5s cubic-bezier(.16,1,.3,1);}
+.problem-card:hover{border-color:var(--edge-r);background:linear-gradient(145deg,rgba(22,36,71,.8),rgba(16,26,51,.92));}
+.problem-card:hover::before{transform:scaleX(1);}
+.problem-icon{font-size:1.6rem;margin-bottom:20px;display:block;}
+.problem-title{font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem;color:#fff;margin-bottom:10px;line-height:1.3;}
+.problem-desc{font-size:.84rem;color:var(--muted);line-height:1.78;}
+.problem-desc strong{color:rgba(232,0,26,.85);font-weight:600;}
+.problem-cta-band{margin-top:2px;background:linear-gradient(145deg,rgba(22,36,71,.8),rgba(16,26,51,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:52px 60px;display:flex;align-items:center;justify-content:space-between;gap:60px;flex-wrap:wrap;}
+.problem-cta-txt{font-family:var(--font-display);font-size:clamp(1.8rem,3.5vw,3.5rem);color:#fff;line-height:1.0;letter-spacing:1px;}
+.problem-cta-txt em{color:var(--red);font-style:normal;}
+
+/* SOLUTION INTRO */
+.solution-intro{background:transparent;padding:120px 80px;position:relative;overflow:hidden;}
+.solution-intro::before{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(10,16,32,.92),rgba(16,26,51,.92)),radial-gradient(ellipse 60% 55% at 50% 0%,rgba(232,0,26,.09),transparent 60%),radial-gradient(ellipse 50% 40% at 50% 100%,rgba(124,146,196,.08),transparent 60%);pointer-events:none;}
+.sol-center{max-width:1280px;margin:0 auto;text-align:center;position:relative;z-index:1;}
+.sol-tag{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:.5rem;letter-spacing:4px;text-transform:uppercase;color:var(--red);margin-bottom:32px;}
+.sol-tag::before,.sol-tag::after{content:'';width:24px;height:1px;background:var(--red);}
+.sol-h{font-family:var(--font-display);font-size:clamp(2.8rem,6vw,7rem);line-height:.92;letter-spacing:1px;color:#fff;margin-bottom:28px;}
+.sol-h em{color:var(--red);font-style:normal;}
+.sol-h .out{-webkit-text-stroke:1px rgba(255,255,255,.2);color:transparent;}
+.sol-p{font-size:1rem;font-weight:300;line-height:1.9;color:var(--muted);max-width:640px;margin:0 auto;}
+.sol-p strong{color:#fff;font-weight:600;}
+
+/* CAPABILITIES */
+.caps-header{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:end;margin-bottom:80px;}
+.caps-intro{font-size:1rem;color:var(--muted);line-height:1.85;max-width:480px;}
+.caps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
+.cap-card{background:linear-gradient(160deg,rgba(22,36,71,.5),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:48px 36px;position:relative;overflow:hidden;transition:border-color .4s,background .4s,transform .4s;min-height:340px;display:flex;flex-direction:column;}
+.cap-card:hover{border-color:var(--edge-r);background:linear-gradient(160deg,rgba(34,52,100,.6),rgba(16,26,51,.92));transform:translateY(-4px);}
+.cap-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--red),transparent);transform:scaleX(0);transition:transform .5s;}
+.cap-card:hover::after{transform:scaleX(1);}
+.cap-num{font-family:var(--font-mono);font-size:.48rem;letter-spacing:2px;color:var(--dim);margin-bottom:24px;}
+.cap-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:rgba(232,0,26,.08);border:1px solid var(--edge-r);margin-bottom:24px;font-size:1.4rem;}
+.cap-title{font-family:var(--font-display);font-size:1.6rem;letter-spacing:1px;color:#fff;margin-bottom:14px;line-height:1.1;}
+.cap-desc{font-size:.85rem;color:var(--muted);line-height:1.8;flex-grow:1;}
+.cap-tag{margin-top:24px;display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:.44rem;letter-spacing:2px;text-transform:uppercase;color:var(--red);}
+
+/* BENEFITS */
+.benefits-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:72px;}
+.benefit{background:linear-gradient(170deg,rgba(22,36,71,.55),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:44px 32px;transition:border-color .4s,background .4s;position:relative;}
+.benefit:hover{border-color:var(--edge-r);background:linear-gradient(170deg,rgba(34,52,100,.65),rgba(16,26,51,.92));}
+.benefit-num{font-family:var(--font-display);font-size:3.5rem;color:var(--red);letter-spacing:1px;line-height:1;margin-bottom:18px;}
+.benefit-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:.92rem;color:#fff;margin-bottom:10px;}
+.benefit-desc{font-size:.78rem;color:var(--muted);line-height:1.75;}
+
+/* RESULTS */
+.results-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:72px;}
+.result-card{background:linear-gradient(155deg,rgba(16,26,51,.7),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:48px 38px;transition:border-color .4s,background .4s;}
+.result-card:hover{border-color:var(--edge-r);background:linear-gradient(155deg,rgba(22,36,71,.8),rgba(16,26,51,.92));}
+.result-quote{font-family:var(--font-display);font-size:1.8rem;color:var(--red);line-height:1;margin-bottom:18px;}
+.result-text{font-size:.92rem;color:#fff;line-height:1.7;margin-bottom:28px;font-weight:300;}
+.result-author{display:flex;flex-direction:column;gap:4px;padding-top:20px;border-top:1px solid var(--edge-b);}
+.result-name{font-family:var(--font-mono);font-size:.6rem;letter-spacing:2px;color:#fff;text-transform:uppercase;}
+.result-role{font-family:var(--font-mono);font-size:.5rem;letter-spacing:2px;color:var(--dim);text-transform:uppercase;}
+
+/* PROCESS */
+.process-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:72px;}
+.step{background:linear-gradient(170deg,rgba(22,36,71,.55),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:44px 32px;position:relative;transition:border-color .4s,background .4s;}
+.step:hover{border-color:var(--edge-r);background:linear-gradient(170deg,rgba(34,52,100,.65),rgba(16,26,51,.92));}
+.step-num{font-family:var(--font-display);font-size:4rem;color:rgba(232,0,26,.3);letter-spacing:1px;line-height:1;margin-bottom:24px;}
+.step-title{font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem;color:#fff;margin-bottom:12px;}
+.step-desc{font-size:.82rem;color:var(--muted);line-height:1.78;}
+
+/* FAQ */
+.faq-list{margin-top:72px;display:flex;flex-direction:column;gap:2px;}
+.faq-item{background:linear-gradient(145deg,rgba(16,26,51,.7),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);transition:border-color .4s,background .4s;}
+.faq-item.open{border-color:var(--edge-r);background:linear-gradient(145deg,rgba(22,36,71,.8),rgba(16,26,51,.92));}
+.faq-q{width:100%;background:none;border:none;text-align:left;padding:28px 36px;display:flex;align-items:center;justify-content:space-between;gap:24px;font-family:'Outfit',sans-serif;font-weight:500;font-size:.95rem;color:#fff;}
+.faq-icon{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:1.2rem;transition:transform .35s;flex-shrink:0;}
+.faq-item.open .faq-icon{transform:rotate(45deg);}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.16,1,.3,1);}
+.faq-a-inner{padding:0 36px 28px;font-size:.88rem;color:var(--muted);line-height:1.8;}
+
+/* CONTACT */
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:72px;align-items:start;}
+.contact-info p{font-size:1rem;color:var(--muted);line-height:1.85;margin-bottom:32px;max-width:440px;}
+.contact-info p strong{color:#fff;}
+.contact-meta{display:flex;flex-direction:column;gap:18px;}
+.contact-meta-item{display:flex;flex-direction:column;gap:4px;padding-bottom:18px;border-bottom:1px solid var(--edge-b);}
+.contact-meta-lbl{font-family:var(--font-mono);font-size:.46rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim);}
+.contact-meta-val{font-family:'Outfit',sans-serif;font-weight:400;font-size:.95rem;color:#fff;}
+.contact-form{background:linear-gradient(145deg,rgba(22,36,71,.6),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:44px 40px;display:flex;flex-direction:column;gap:22px;}
+.form-row{display:flex;flex-direction:column;gap:8px;}
+.form-row label{font-family:var(--font-mono);font-size:.46rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim);}
+.form-row input,.form-row textarea,.form-row select{background:transparent;border:none;border-bottom:1px solid var(--edge-b);padding:10px 0;font-family:'Outfit',sans-serif;font-size:.95rem;color:#fff;outline:none;transition:border-color .3s;resize:none;}
+.form-row input:focus,.form-row textarea:focus,.form-row select:focus{border-color:var(--red);}
+.form-row textarea{min-height:90px;}
+.form-row select option{background:var(--navy);color:#fff;}
+
+/* FOOTER */
+.footer{background:linear-gradient(180deg,#040608 0%,#080d18 100%);padding:80px 80px 40px;border-top:1px solid var(--edge-b);position:relative;z-index:2;}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:60px;max-width:1280px;margin:0 auto 60px;}
+.footer-brand .nav-logo{font-size:2rem;display:block;margin-bottom:20px;}
+.footer-brand p{font-size:.88rem;color:var(--muted);line-height:1.8;max-width:340px;}
+.footer-col h4{font-family:var(--font-mono);font-size:.5rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:20px;}
+.footer-col ul{list-style:none;display:flex;flex-direction:column;gap:12px;}
+.footer-col a{font-size:.85rem;color:var(--muted);text-decoration:none;transition:color .3s;}
+.footer-col a:hover{color:#fff;}
+.footer-bottom{max-width:1280px;margin:0 auto;padding-top:30px;border-top:1px solid var(--edge-b);display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;}
+.footer-copy{font-family:var(--font-mono);font-size:.48rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim);}
+
+/* RESPONSIVE */
+@media(max-width:1100px){
+  .hero{grid-template-columns:1fr;min-height:auto;}
+  .hero-body{padding:120px 32px 40px;max-width:100%;}
+  .hero-3d{height:auto;min-height:auto;padding:20px 32px 80px;}
+  .hero-3d-frame{max-width:380px;}
+  .hero-scroll{display:none;}
+}
+@media(max-width:1024px){
+  .nav,.nav.stuck{padding:18px 32px;}
+  .nav-links{display:none;}
+  .ham{display:flex;}.mob-menu{display:flex;}
+  .section{padding:100px 32px;}
+  .solution-intro{padding:100px 32px;}
+  .caps-header{grid-template-columns:1fr;gap:32px;}
+  .caps-grid,.benefits-grid,.results-grid,.process-grid{grid-template-columns:repeat(2,1fr);}
+  .contact-grid,.footer-grid{grid-template-columns:1fr;gap:40px;}
+  .footer{padding:60px 32px 30px;}
+}
+@media(max-width:640px){
+  .problem-grid{grid-template-columns:1fr;}
+  .caps-grid,.benefits-grid,.results-grid,.process-grid{grid-template-columns:1fr;}
+  .problem-cta-band{padding:40px 28px;flex-direction:column;align-items:flex-start;gap:24px;}
+}
+</style>
 </head>
 <body>
 
-  <!-- LOADER -->
-  <div id="zs-loader">
-    <div class="zs-loader-logo">
-      <span>Z</span><span>E</span><span>N</span><em><span>S</span><span>H</span><span>A</span></em>
-    </div>
-    <div class="zs-loader-bar-wrap">
-      <div class="zs-loader-bar-fill"></div>
-    </div>
-    <div class="zs-loader-tag">Digital Systems Studio · Est. 2026</div>
+<!-- LOADER -->
+<div id="loader">
+  <div class="ld-logo">
+    <span>Z</span><span>E</span><span>N</span><span>S</span><span>H</span><span>A</span>
   </div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+  <div class="ld-sub">Initializing Revenue Systems</div>
+</div>
 
-  <!-- CURSOR -->
-  <div id="zs-cur-dot"></div>
-  <div id="zs-cur-ring"></div>
+<div id="cur-dot"></div>
+<div id="cur-ring"></div>
 
-  <!-- ATMOSPHERE -->
-  <div id="zs-grain"></div>
-  <div id="zs-scan"></div>
-  <div id="zs-bar"></div>
+<canvas id="site-bg"></canvas>
 
-  <!-- MOBILE MENU -->
-  <div class="zs-mobile-menu" id="zs-mobile-menu">
-    <a class="zs-mob-link" href="#zs-pain"   onclick="scrollToId('zs-pain');return false;">The Problem</a>
-    <a class="zs-mob-link" href="#results"   onclick="scrollToId('results');return false;">Results</a>
-    <a class="zs-mob-link" href="#capabilities" onclick="scrollToId('capabilities');return false;">The System</a>
-    <a class="zs-mob-link" href="#pricing"   onclick="scrollToId('pricing');return false;">Pricing</a>
-    <a class="zs-mob-link" href="#contact"   onclick="scrollToId('contact');return false;">Contact</a>
-    <button class="zs-mob-cta" onclick="scrollToId('contact')">Get More Clients →</button>
+<div id="zs-bar"></div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <a href="#" class="nav-logo">ZEN<em>SHA</em></a>
+  <div class="nav-links">
+    <a href="#problem">Problem</a>
+    <a href="#capabilities">Capabilities</a>
+    <a href="#results">Results</a>
+    <a href="#process">Process</a>
+    <a href="#faq">FAQ</a>
   </div>
+  <button class="nav-cta" onclick="document.getElementById('contact').scrollIntoView()">Book Audit</button>
+  <button class="ham" id="ham"><span></span><span></span><span></span></button>
+</nav>
 
-  <!-- NAV -->
-  <nav class="zs-nav" id="zs-nav">
-    <a class="zs-logo" href="#" onclick="scrollToId('hero');return false;">ZEN<em>SHA</em></a>
-    <div class="zs-nav-links">
-      <a href="#zs-pain"    onclick="scrollToId('zs-pain');return false;">The Problem</a>
-      <a href="#results"    onclick="scrollToId('results');return false;">Results</a>
-      <a href="#capabilities" onclick="scrollToId('capabilities');return false;">System</a>
-      <a href="#pricing"    onclick="scrollToId('pricing');return false;">Pricing</a>
-      <a href="#contact"    onclick="scrollToId('contact');return false;">Contact</a>
+<div class="mob-menu" id="mobMenu">
+  <a href="#problem" class="mob-link">Problem</a>
+  <a href="#capabilities" class="mob-link">Capabilities</a>
+  <a href="#results" class="mob-link">Results</a>
+  <a href="#contact" class="mob-link">Contact</a>
+</div>
+
+<!-- HERO with 3D MODEL -->
+<section class="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-veil"></div>
+
+  <div class="hero-body">
+    <div class="hero-eyebrow">
+      <span class="hero-eyebrow-dot"></span>
+      <span class="hero-eyebrow-txt">AI Revenue Systems · Est. 2024</span>
     </div>
-    <div class="zs-nav-right">
-      <div class="zs-live">
-        <div class="zs-live-dot"></div>
-        5 SLOTS THIS WEEK
-      </div>
-      <button class="zs-btn-primary" onclick="scrollToId('contact')">Get More Clients</button>
-      <button class="zs-hamburger" id="zs-hamburger" aria-label="Toggle menu">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
-  </nav>
-
-  <!-- HERO -->
-  <section class="zs-hero" id="hero">
-    <canvas id="zs-canvas"></canvas>
-    <div class="zs-hero-veil"></div>
-    <div class="zs-hero-glyph">Z</div>
-
-    <div class="zs-hero-body">
-      <div class="zs-pre">
-        <div class="zs-pre-bar"></div>
-        <span class="zs-pre-txt">Revenue Systems Studio</span>
-        <span class="zs-pre-sep">·</span>
-        <span class="zs-pre-txt">Live in 7 Days</span>
-      </div>
-
-      <h1 class="zs-h1">
-        <span class="s1">Your Website Should Be</span>
-        <span class="s2">Making You Money</span>
-        <span class="s3"><span style="color:var(--text)">Right Now.</span><br>Is It?</span>
-        <span class="s4">We build AI-powered revenue systems that attract leads, convert visitors, and close clients — 24/7, on autopilot.</span>
-      </h1>
-
-      <p class="zs-hero-copy">
-        Every day without a proper system is revenue walking out the door.
-        <strong>We fix that in 7 days.</strong> Websites. AI chatbots. Automation. Lead generation. SEO. One complete revenue engine.
-      </p>
-
-      <div class="zs-hero-btns">
-        <button class="zs-btn-a" onclick="scrollToId('pricing')" style="padding:20px 60px;font-size:.75rem;letter-spacing:4px;">Get More Clients Now →</button>
-        <button class="zs-btn-b" onclick="scrollToId('zs-pain')">See Why You're Losing Money</button>
-      </div>
-      <div class="zs-hero-urgency">
-        <span class="zs-hero-urgency-dot"></span>
-        <strong>Only 5 client slots per week.</strong> &nbsp;Businesses that act today start winning this month.
-      </div>
-
-      <!-- HERO TRUST STRIP -->
-      <div class="zs-hero-trust">
-        <div class="zs-htrust-stars">★★★★★ <span>4.9/5</span> from verified clients</div>
-        <div class="zs-htrust-sep">·</div>
-        <div class="zs-htrust-item">✓ Done-For-You</div>
-        <div class="zs-htrust-sep">·</div>
-        <div class="zs-htrust-item">✓ Live in 7 Days</div>
-        <div class="zs-htrust-sep">·</div>
-        <div class="zs-htrust-item">✓ No Long Contracts</div>
-      </div>
-    </div>
-
-    <div class="zs-hero-aside">
-      <div class="zs-aside-row"><span class="zs-aside-k">AVG. CONV. LIFT</span><span class="zs-aside-v">3–6X</span></div>
-      <div class="zs-aside-row"><span class="zs-aside-k">LEADS AUTOMATED</span><span class="zs-aside-v">24/7 Active</span></div>
-      <div class="zs-aside-row"><span class="zs-aside-k">DELIVERY</span><span class="zs-aside-v">7 Days</span></div>
-      <div class="zs-aside-row"><span class="zs-aside-k">SLOTS LEFT</span><span class="zs-aside-v">5 / Week</span></div>
-    </div>
-
-    <div class="zs-scroll" onclick="scrollToId('capabilities')" style="cursor:pointer;">
-      <div class="zs-scroll-line"></div>
-      <span class="zs-scroll-lbl">SCROLL</span>
-    </div>
-  </section>
-
-  <!-- TICKER -->
-  <div class="zs-ticker">
-    <div class="zs-ticker-track" id="zs-ticker-track"></div>
-  </div>
-
-  <!-- STATS COUNTER -->
-  <div class="zs-stats">
-    <div class="zs-stats-grid">
-      <div class="zs-stat rev d1">
-        <div class="zs-stat-num" data-count="4" data-suffix="X">0X</div>
-        <div class="zs-stat-lbl">Avg. Conversion Lift</div>
-        <div class="zs-stat-sub">Clients see 4–6X more leads from the same traffic after our system is live</div>
-      </div>
-      <div class="zs-stat rev d2">
-        <div class="zs-stat-num" data-count="7" data-suffix=" Days">0 Days</div>
-        <div class="zs-stat-lbl">Delivery Guarantee</div>
-        <div class="zs-stat-sub">Your complete revenue system — live and generating leads within one week</div>
-      </div>
-      <div class="zs-stat rev d3">
-        <div class="zs-stat-num" data-count="24" data-suffix="/7">0/7</div>
-        <div class="zs-stat-lbl">AI Lead Capture</div>
-        <div class="zs-stat-sub">Your AI bot works around the clock so you never miss a lead again</div>
-      </div>
-      <div class="zs-stat rev d4">
-        <div class="zs-stat-num" data-count="5" data-suffix=" Slots">0 Slots</div>
-        <div class="zs-stat-lbl">Per Week Only</div>
-        <div class="zs-stat-sub">We cap intake deliberately — so every client gets full attention and real results</div>
-      </div>
+    <h1 class="hero-h1">
+      <span class="outline">Engineered</span><br/>
+      for <span class="red">Revenue.</span><br/>
+      <span class="navy">Built to Scale.</span>
+    </h1>
+    <p class="hero-sub">
+      We build <strong>autonomous AI systems</strong> that capture leads, qualify prospects, and close deals — while your team sleeps. No fluff. Just measurable revenue.
+    </p>
+    <div class="hero-btns">
+      <button class="btn-primary" onclick="document.getElementById('contact').scrollIntoView()">Book Free Audit →</button>
+      <button class="btn-ghost" onclick="document.getElementById('capabilities').scrollIntoView()">See Capabilities</button>
     </div>
   </div>
 
-  <!-- PAIN SECTION -->
-  <section class="zs-sect zs-pain" id="zs-pain">
-    <div class="zs-pain-inner">
-      <div class="rev">
-        <div class="zs-eye">
-          <span class="zs-eye-n" style="color:rgba(255,255,255,.4)">01</span>
-          <div class="zs-eye-bar" style="background:rgba(255,255,255,.2)"></div>
-          <span class="zs-eye-t" style="color:rgba(255,255,255,.4)">The Problem</span>
-          <div class="zs-eye-dot"></div>
-        </div>
-        <h2 class="zs-sh" style="color:#fff;">Your Business Is<br><em>Bleeding Revenue</em><br><span style="color:rgba(255,255,255,.4);font-size:.65em;letter-spacing:-1px;">And You Don't Even See It.</span></h2>
+  <div class="hero-3d">
+    <div class="hero-3d-frame">
+      <div class="hero-3d-ring2"></div>
+      <div class="hero-3d-ring"></div>
+      <div class="hero-3d-corners"></div>
+      <canvas id="model-canvas"></canvas>
+      <div class="hero-3d-label">Zensha <em>Core</em> · Revenue Engine v2.4</div>
+    </div>
+  </div>
+
+  <div class="hero-scroll">
+    <div class="hero-scroll-line"></div>
+    <div class="hero-scroll-lbl">Scroll</div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-track">
+    <span class="tick-item">AI Lead Generation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Voice Agents</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Chatbot Systems</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Sales Automation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">CRM Integration</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Custom AI Workflows</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">AI Lead Generation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Voice Agents</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Chatbot Systems</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Sales Automation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">CRM Integration</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Custom AI Workflows</span><span class="tick-item tick-dot">◆</span>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section class="section problem" id="problem">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">01</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">The Problem</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">Your team is <em>bleeding</em><br/><span class="dim-txt">revenue every hour.</span></h2>
+    <div class="problem-grid">
+      <div class="problem-card rev d1">
+        <span class="problem-icon">⏱</span>
+        <h3 class="problem-title">Slow Lead Response</h3>
+        <p class="problem-desc">Studies show <strong>78% of leads buy from the first responder</strong>. If you reply in hours — you've already lost.</p>
       </div>
-      <div class="zs-pain-grid rev d2">
-        <div class="zs-pain-item">
-          <span class="zs-pain-icon">📉</span>
-          <div class="zs-pain-title">Your website gets visitors. None of them call.</div>
-          <div class="zs-pain-desc">A beautiful website that doesn't convert is just an expensive brochure. <strong>You're paying for traffic that disappears.</strong> Every bounced visitor is a client your competitor gets instead.</div>
-        </div>
-        <div class="zs-pain-item">
-          <span class="zs-pain-icon">🔕</span>
-          <div class="zs-pain-title">Leads come in. Then go cold. No system to follow up.</div>
-          <div class="zs-pain-desc">You reply hours later. Or the next day. By then they've moved on. <strong>Speed wins deals.</strong> Without an automated follow-up system, you're losing 70% of your leads before the first conversation.</div>
-        </div>
-        <div class="zs-pain-item">
-          <span class="zs-pain-icon">🏁</span>
-          <div class="zs-pain-title">Competitors with worse services are beating you.</div>
-          <div class="zs-pain-desc">They have AI chatbots answering at 2AM. Automated funnels nurturing leads. <strong>They look bigger than they are.</strong> You're doing everything manually and paying the price every month.</div>
-        </div>
-        <div class="zs-pain-item">
-          <span class="zs-pain-icon">💸</span>
-          <div class="zs-pain-title">You're running ads but the landing page converts at 1–2%.</div>
-          <div class="zs-pain-desc">₹50,000 in ads with a broken website is just burning money. <strong>The problem isn't the ads — it's what they land on.</strong> Fix the conversion rate and the same spend gets 4–6X more clients.</div>
-        </div>
-        <div class="zs-pain-item">
-          <span class="zs-pain-icon">🔄</span>
-          <div class="zs-pain-title">You're doing manually what should run on autopilot.</div>
-          <div class="zs-pain-desc">Answering the same questions. Sending follow-up emails. Booking calls manually. <strong>This isn't growth — it's a hamster wheel.</strong> You can't scale a business that requires you for every step.</div>
-        </div>
-        <div class="zs-pain-item">
-          <span class="zs-pain-icon">📊</span>
-          <div class="zs-pain-title">No visibility. No data. No way to know what's working.</div>
-          <div class="zs-pain-desc">You have no idea where your leads come from, which pages convert, or which messages close clients. <strong>You're making decisions blind.</strong> That's not a business — that's a guess.</div>
-        </div>
+      <div class="problem-card rev d2">
+        <span class="problem-icon">📞</span>
+        <h3 class="problem-title">Missed Calls = Lost Deals</h3>
+        <p class="problem-desc">Every missed call is <strong>$200-$2,000 in lost revenue</strong>. Your competitors are picking up while you're not.</p>
       </div>
-      <div class="zs-pain-banner rev d3">
-        <div>
-          <div class="zs-pain-banner-txt">The cost of doing nothing?<br><em>₹2–5 Lakh per year</em> in missed revenue.</div>
-          <div class="zs-pain-banner-sub">For every month you delay building a proper system, clients choose competitors who already have one. The gap compounds.</div>
-        </div>
-        <button class="zs-btn-a" onclick="scrollToId('capabilities')" style="white-space:nowrap;padding:22px 56px;font-size:.72rem;letter-spacing:4px;flex-shrink:0;">See the Fix →</button>
+      <div class="problem-card rev d3">
+        <span class="problem-icon">💸</span>
+        <h3 class="problem-title">Wasted Ad Spend</h3>
+        <p class="problem-desc">You pay for clicks, then <strong>70% of leads never get followed up</strong>. That's pure cash burned.</p>
+      </div>
+      <div class="problem-card rev d4">
+        <span class="problem-icon">🌙</span>
+        <h3 class="problem-title">After-Hours Black Hole</h3>
+        <p class="problem-desc">Half your inquiries arrive <strong>outside business hours</strong>. By morning, they've moved on.</p>
       </div>
     </div>
-  </section>
-  <section class="zs-sect zs-cap" id="capabilities">
-    <div class="zs-wrap">
-      <div class="zs-cap-hd">
-        <div class="rev">
-          <div class="zs-eye">
-            <span class="zs-eye-n">01</span>
-            <div class="zs-eye-bar"></div>
-            <span class="zs-eye-t">The Revenue System</span>
-            <div class="zs-eye-dot"></div>
-          </div>
-          <h2 class="zs-sh">One System.<br><em>Every Revenue Lever.</em></h2>
-        </div>
-        <div class="rev d1">
-          <div class="zs-cap-aside">
-            <p>This isn't a collection of services. This is a <strong>complete revenue machine</strong> — each layer built to attract, convert, close, and retain clients automatically. Every component multiplies the one above it.</p>
-            <div class="zs-cap-note">Not a service. A growth engine.</div>
-          </div>
-        </div>
-      </div>
-      <div class="zs-able" id="zs-able"></div>
+    <div class="problem-cta-band rev d2">
+      <div class="problem-cta-txt">Sound familiar?<br/><em>We fix all of it.</em></div>
+      <button class="btn-primary" onclick="document.getElementById('contact').scrollIntoView()">Get Free Audit →</button>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- GRAPH SECTION -->
-  <section class="zs-sect zs-graph" id="results">
-    <div class="zs-graph-inner">
-      <div class="rev">
-        <div class="zs-eye">
-          <span class="zs-eye-n">02</span>
-          <div class="zs-eye-bar"></div>
-          <span class="zs-eye-t">The Numbers</span>
-          <div class="zs-eye-dot"></div>
-        </div>
-        <h2 class="zs-sh">Same Traffic.<br><em>6X More Revenue.</em></h2>
-      </div>
-      <div class="zs-graph-panels">
-        <div class="zs-graph-panel rev d1">
-          <div class="zs-graph-label bad"><div class="zs-graph-label-dot"></div>Without Zensha System</div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Monthly Visitors</span><span class="zs-bar-val">1,000</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill" style="width:100%"></div></div>
-          </div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Leads Generated</span><span class="zs-bar-val">20</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill" style="width:14%"></div></div>
-          </div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Paying Clients</span><span class="zs-bar-val">2</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill" style="width:6%"></div></div>
-          </div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Monthly Revenue</span><span class="zs-bar-val">₹20,000</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill" style="width:10%"></div></div>
-          </div>
-          <div class="zs-graph-caption">A generic website with no system. 98% of visitors leave without acting. No follow-up. No AI. No automation. Revenue stays flat.</div>
-        </div>
-        <div class="zs-graph-panel active rev d2">
-          <div class="zs-graph-label good"><div class="zs-graph-label-dot"></div>With Zensha System</div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Monthly Visitors</span><span class="zs-bar-val">1,000</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill red" style="width:100%"></div></div>
-          </div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Leads Generated</span><span class="zs-bar-val red">80+</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill red" style="width:72%"></div></div>
-          </div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Paying Clients</span><span class="zs-bar-val red">12+</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill red" style="width:48%"></div></div>
-          </div>
-          <div class="zs-bar-row">
-            <div class="zs-bar-meta"><span class="zs-bar-key">Monthly Revenue</span><span class="zs-bar-val red">₹1,20,000+</span></div>
-            <div class="zs-bar-track"><div class="zs-bar-fill red" style="width:100%"></div></div>
-          </div>
-          <div class="zs-graph-caption"><strong>Same 1,000 visitors. 6X more revenue.</strong> High-converting website + AI chatbot capturing leads 24/7 + automated follow-up = a business that grows while you sleep.</div>
-        </div>
-      </div>
+<!-- SOLUTION INTRO -->
+<section class="solution-intro">
+  <div class="sol-center">
+    <div class="sol-tag rev">The Zensha Method</div>
+    <h2 class="sol-h rev d1"><span class="out">Autonomous</span> systems that<br/><em>never sleep</em>, never miss.</h2>
+    <p class="sol-p rev d2">We deploy <strong>custom AI agents</strong> trained on your business — handling lead capture, qualification, booking, and follow-up automatically. You get a 24/7 sales engine that integrates with your existing stack.</p>
+  </div>
+</section>
 
-      <div class="zs-conversion-block rev d3">
-        <div class="zs-conv-side">
-          <div class="zs-conv-label">Before Zensha</div>
-          <div class="zs-conv-flow">
-            <div class="zs-conv-step"><div class="zs-conv-step-num dim">100</div><div class="zs-conv-step-lbl">Visitors land<br>on your site</div></div>
-            <div class="zs-conv-arrow">↓</div>
-            <div class="zs-conv-step"><div class="zs-conv-step-num dim">8</div><div class="zs-conv-step-lbl">Submit a form<br>or enquire</div></div>
-            <div class="zs-conv-arrow">↓</div>
-            <div class="zs-conv-step"><div class="zs-conv-step-num dim">2</div><div class="zs-conv-step-lbl">Become paying<br>clients</div></div>
-          </div>
-          <div class="zs-conv-result dim">2% Conversion · ₹20,000/month</div>
+<!-- CAPABILITIES -->
+<section class="section caps" id="capabilities">
+  <div class="wrap">
+    <div class="caps-header">
+      <div>
+        <div class="eyebrow rev">
+          <span class="eyebrow-num">02</span>
+          <span class="eyebrow-line"></span>
+          <span class="eyebrow-txt">Capabilities</span>
+          <span class="eyebrow-dot"></span>
         </div>
-        <div class="zs-conv-side">
-          <div class="zs-conv-label">After Zensha</div>
-          <div class="zs-conv-flow">
-            <div class="zs-conv-step"><div class="zs-conv-step-num bright">100</div><div class="zs-conv-step-lbl">Same visitors.<br>Better system.</div></div>
-            <div class="zs-conv-arrow" style="color:rgba(204,0,0,.4)">↓</div>
-            <div class="zs-conv-step"><div class="zs-conv-step-num bright">35+</div><div class="zs-conv-step-lbl">Captured by AI chatbot<br>+ optimised page</div></div>
-            <div class="zs-conv-arrow" style="color:rgba(204,0,0,.4)">↓</div>
-            <div class="zs-conv-step"><div class="zs-conv-step-num bright">8+</div><div class="zs-conv-step-lbl">Closed via automated<br>follow-up sequences</div></div>
-          </div>
-          <div class="zs-conv-result bright">8% Conversion · ₹80,000+/month</div>
-        </div>
-        <div>
-          <div class="zs-conv-hero-txt">That's a<br><em>4X Revenue</em><br>increase.<br><span style="font-size:.5em;color:rgba(255,255,255,.3);font-weight:600;letter-spacing:0">Zero extra ad spend.</span></div>
-          <div class="zs-conv-sub">The same 100 visitors. The same budget. The difference is <strong>what happens when they land — and what happens after they leave.</strong></div>
-          <button class="zs-btn-a" onclick="scrollToId('pricing')" style="margin-top:32px;padding:20px 52px;font-size:.7rem;letter-spacing:3.5px;">I Want This System →</button>
-        </div>
+        <h2 class="section-h rev d1">What we<br/><em>build.</em></h2>
+      </div>
+      <p class="caps-intro rev d2">Production-grade AI systems deployed in weeks, not months. Each solution is custom-trained on your business and integrated with your existing CRM, calendar, and comms stack.</p>
+    </div>
+    <div class="caps-grid">
+      <div class="cap-card rev d1">
+        <div class="cap-num">// 01</div>
+        <div class="cap-icon">🤖</div>
+        <h3 class="cap-title">AI Voice Agents</h3>
+        <p class="cap-desc">Natural-sounding AI receptionists that answer calls 24/7, qualify leads, book appointments, and route hot prospects to your team in real-time.</p>
+        <div class="cap-tag">● Always On</div>
+      </div>
+      <div class="cap-card rev d2">
+        <div class="cap-num">// 02</div>
+        <div class="cap-icon">💬</div>
+        <h3 class="cap-title">Chatbot Systems</h3>
+        <p class="cap-desc">Custom-trained chatbots for your website, WhatsApp, and Instagram DMs. They answer FAQs, qualify leads, and book meetings instantly.</p>
+        <div class="cap-tag">● Multi-Channel</div>
+      </div>
+      <div class="cap-card rev d3">
+        <div class="cap-num">// 03</div>
+        <div class="cap-icon">⚡</div>
+        <h3 class="cap-title">Lead Automation</h3>
+        <p class="cap-desc">Automated follow-up sequences via SMS, email, and voice — triggered the moment a lead comes in. Nothing slips through the cracks.</p>
+        <div class="cap-tag">● Instant Reply</div>
+      </div>
+      <div class="cap-card rev d4">
+        <div class="cap-num">// 04</div>
+        <div class="cap-icon">🔗</div>
+        <h3 class="cap-title">CRM Integration</h3>
+        <p class="cap-desc">Seamless integration with HubSpot, Salesforce, Pipedrive, GoHighLevel, and more. Every interaction logged and tracked automatically.</p>
+        <div class="cap-tag">● Plug & Play</div>
+      </div>
+      <div class="cap-card rev d5">
+        <div class="cap-num">// 05</div>
+        <div class="cap-icon">📊</div>
+        <h3 class="cap-title">Sales Analytics</h3>
+        <p class="cap-desc">Real-time dashboards showing lead source, conversion rates, AI performance, and revenue attribution — so you know exactly what's working.</p>
+        <div class="cap-tag">● Data-Driven</div>
+      </div>
+      <div class="cap-card rev d6">
+        <div class="cap-num">// 06</div>
+        <div class="cap-icon">⚙️</div>
+        <h3 class="cap-title">Custom Workflows</h3>
+        <p class="cap-desc">Bespoke AI workflows tailored to your unique business logic. From onboarding to retention — we automate the repetitive, scale the strategic.</p>
+        <div class="cap-tag">● Tailored</div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ROI SECTION -->
-  <section class="zs-sect zs-roi" id="roi">
-    <div class="zs-roi-inner">
-      <div class="rev">
-        <div class="zs-eye">
-          <span class="zs-eye-n">03</span>
-          <div class="zs-eye-bar"></div>
-          <span class="zs-eye-t">The ROI</span>
-          <div class="zs-eye-dot"></div>
-        </div>
-        <h2 class="zs-sh">This System Pays<br>For Itself in <em>Weeks.</em></h2>
+<!-- BENEFITS -->
+<section class="section benefits">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">03</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Outcomes</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">The <em>numbers</em><br/><span class="dim-txt">that matter.</span></h2>
+    <div class="benefits-grid">
+      <div class="benefit rev d1">
+        <div class="benefit-num">3×</div>
+        <h3 class="benefit-title">Faster Lead Response</h3>
+        <p class="benefit-desc">From hours to seconds. Catch leads while they're still hot and ready to buy.</p>
       </div>
-      <div class="zs-roi-grid">
-        <div class="zs-roi-calc rev d1">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:32px;">Revenue Calculator · Growth Plan</div>
-          <div class="zs-roi-row"><span class="zs-roi-item">Your Avg. Client Value</span><span class="zs-roi-num">₹10,000</span></div>
-          <div class="zs-roi-row"><span class="zs-roi-item">Extra Clients / Month (min)</span><span class="zs-roi-num green">+5</span></div>
-          <div class="zs-roi-row"><span class="zs-roi-item">Extra Revenue / Month</span><span class="zs-roi-num green">₹50,000</span></div>
-          <div class="zs-roi-row"><span class="zs-roi-item">Extra Revenue / Year</span><span class="zs-roi-num green">₹6,00,000</span></div>
-          <div class="zs-roi-row"><span class="zs-roi-item">System Investment (Growth Plan)</span><span class="zs-roi-num red">₹29,999</span></div>
-          <div class="zs-roi-total">
-            <div class="zs-roi-total-lbl">Net Gain in Year One</div>
-            <div class="zs-roi-total-num">₹5,70,001</div>
-          </div>
-        </div>
-        <div class="zs-roi-side rev d2">
-          <h3>Missing just <em>2 clients</em> costs more than this entire system.</h3>
-          <p>If your average client is worth ₹10,000 — just 3 extra clients this month pays for the system in full. Everything after that is <strong>pure profit.</strong></p>
-          <p>While you wait, your competitors are capturing every lead you're missing. <strong>The system doesn't cost you money. Not having it does.</strong></p>
-          <div class="zs-roi-bullets">
-            <div class="zs-roi-bullet"><div class="zs-roi-bullet-dot"></div><span><strong>Done-for-you</strong> — we build it, you just grow</span></div>
-            <div class="zs-roi-bullet"><div class="zs-roi-bullet-dot"></div><span><strong>Live in 7 days</strong> — not months, not "soon"</span></div>
-            <div class="zs-roi-bullet"><div class="zs-roi-bullet-dot"></div><span><strong>Works 24/7</strong> — even when you're off</span></div>
-            <div class="zs-roi-bullet"><div class="zs-roi-bullet-dot"></div><span><strong>Predictable growth</strong> — not hope and luck</span></div>
-            <div class="zs-roi-bullet"><div class="zs-roi-bullet-dot"></div><span><strong>Only 5 businesses/week</strong> — built for serious operators only</span></div>
-          </div>
-          <button class="zs-btn-a" onclick="scrollToId('pricing')" style="margin-top:40px;padding:20px 56px;font-size:.7rem;letter-spacing:3.5px;">Start Making More Money →</button>
-        </div>
+      <div class="benefit rev d2">
+        <div class="benefit-num">+47%</div>
+        <h3 class="benefit-title">Higher Conversion Rate</h3>
+        <p class="benefit-desc">Consistent, qualified follow-up drives more booked calls and signed deals.</p>
+      </div>
+      <div class="benefit rev d3">
+        <div class="benefit-num">-60%</div>
+        <h3 class="benefit-title">Lower Cost Per Lead</h3>
+        <p class="benefit-desc">Maximize ROI on existing ad spend by converting more of what you already pay for.</p>
+      </div>
+      <div class="benefit rev d4">
+        <div class="benefit-num">24/7</div>
+        <h3 class="benefit-title">Coverage</h3>
+        <p class="benefit-desc">Nights, weekends, holidays — your AI sales engine never clocks out.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- PRICING -->
-  <section class="zs-sect zs-pricing" id="pricing">
-    <div class="zs-wrap">
-      <div class="zs-pricing-hd">
-        <div class="rev">
-          <div class="zs-eye">
-            <span class="zs-eye-n">02</span>
-            <div class="zs-eye-bar"></div>
-            <span class="zs-eye-t">Pricing</span>
-            <div class="zs-eye-dot"></div>
-          </div>
-          <h2 class="zs-sh">Not a Cost.<br><em>A Revenue Engine.</em></h2>
-        </div>
-        <div class="rev d1">
-          <p class="zs-pricing-note">
-            Every plan is built to pay for itself within the first month. <strong>Missing just 2 clients costs more than this entire system.</strong><br><br>
-            <span style="color:var(--gold);font-weight:700;">⚡ Only 5 project slots per week. When they're gone, they're gone.</span>
-          </p>
-        </div>
-      </div>
-
-      <div class="zs-pricing-grid">
-        <!-- BASIC -->
-        <div class="zs-price-card rev d1">
-          <div class="zs-price-tier">Starter</div>
-          <div class="zs-price-amount"><sup>₹</sup><strong>9,999</strong></div>
-          <div class="zs-price-name">Basic Website</div>
-          <div class="zs-price-desc">Stop losing clients to a website that doesn't convert. This turns your online presence into a credible, lead-generating asset from day one.</div>
-          <div class="zs-price-features">
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Up to 5 pages</strong> — Home, About, Services, Contact + 1 custom</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Mobile-first</strong> responsive design</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>SEO foundations</strong> baked in from the start</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Contact form</strong> &amp; WhatsApp integration</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Delivered in 7 days</strong> — guaranteed</span></div>
-          </div>
-          <button class="zs-price-btn outline" onclick="scrollToId('contact')">Start Your AI System →</button>
-          <div class="zs-price-slots"><strong>⚡ Only 5 slots per week</strong></div>
-        </div>
-
-        <!-- GROWTH (FEATURED) -->
-        <div class="zs-price-card featured rev d2">
-          <div class="zs-price-featured-tag">Most Popular</div>
-          <div class="zs-price-tier">Growth</div>
-          <div class="zs-price-amount"><sup>₹</sup><strong>29,999</strong></div>
-          <div class="zs-price-name">AI Bot + Website</div>
-          <div class="zs-price-desc">Your 24/7 sales team. The AI chatbot captures and qualifies every lead — even at 2AM — while your website converts them. Most clients break even in week 3.</div>
-          <div class="zs-price-features">
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Everything in Basic</strong>, plus:</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Custom AI chatbot</strong> trained on your brand &amp; services</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Lead capture</strong> &amp; qualification built into the bot</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>WhatsApp / email handoff</strong> on hot leads</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>30-day post-launch</strong> support included</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Works 24/7</strong> — no team required</span></div>
-          </div>
-          <button class="zs-price-btn solid" onclick="scrollToId('contact')">Start Your AI System →</button>
-          <div class="zs-price-slots"><strong>⚡ Only 5 slots per week</strong></div>
-        </div>
-
-        <!-- ENTERPRISE -->
-        <div class="zs-price-card rev d3">
-          <div class="zs-price-tier">Enterprise</div>
-          <div class="zs-price-amount"><sup>₹</sup><strong>49,999</strong></div>
-          <div class="zs-price-name">Full Automation</div>
-          <div class="zs-price-desc">Your entire business on autopilot. Every lead captured, nurtured, and closed without you lifting a finger. This is what predictable, scalable revenue looks like.</div>
-          <div class="zs-price-features">
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Everything in Growth</strong>, plus:</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Full workflow automation</strong> — CRM, email, follow-ups</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>AI-powered email sequences</strong> for nurture &amp; close</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Social media scheduling</strong> system deployed</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>Analytics dashboard</strong> — one view, every metric</span></div>
-            <div class="zs-price-feat"><div class="zs-price-feat-dot"></div><span><strong>60-day support</strong> &amp; optimization cycle</span></div>
-          </div>
-          <button class="zs-price-btn outline" onclick="scrollToId('contact')">Start Your AI System →</button>
-          <div class="zs-price-slots"><strong>⚡ Only 5 slots per week</strong></div>
+<!-- RESULTS -->
+<section class="section results" id="results">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">04</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Results</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">Don't take<br/><em>our word</em> for it.</h2>
+    <div class="results-grid">
+      <div class="result-card rev d1">
+        <div class="result-quote">"</div>
+        <p class="result-text">Zensha's AI voice agent booked 38 qualified appointments in the first 30 days. We had to hire a second closer just to keep up.</p>
+        <div class="result-author">
+          <span class="result-name">Marcus Reeve</span>
+          <span class="result-role">CEO · Apex Roofing</span>
         </div>
       </div>
-
-      <!-- AUTOPILOT CTA -->
-      <div class="zs-autopilot-cta rev d4">
-        <div class="zs-autopilot-inner">
-          <div class="zs-autopilot-label">The Bottom Line</div>
-          <div class="zs-autopilot-h">Every day without this system<br>is <em>money left on the table.</em></div>
-          <div class="zs-autopilot-sub">Your competitors aren't waiting. Neither should you. 5 slots per week. First-come, first-served. The business that acts today starts winning this month.</div>
-          <button class="zs-btn-a" onclick="scrollToId('contact')" style="padding:20px 60px;font-size:.72rem;letter-spacing:4px;margin-top:12px;">Book My Growth Call →</button>
+      <div class="result-card rev d2">
+        <div class="result-quote">"</div>
+        <p class="result-text">We cut our cost-per-acquisition by 54% in the first quarter. The ROI was undeniable — and it just keeps compounding.</p>
+        <div class="result-author">
+          <span class="result-name">Sofia Caldwell</span>
+          <span class="result-role">CMO · NorthStar Legal</span>
+        </div>
+      </div>
+      <div class="result-card rev d3">
+        <div class="result-quote">"</div>
+        <p class="result-text">The chatbot handles 80% of our inbound inquiries autonomously. My team finally has time to focus on closing — not chasing.</p>
+        <div class="result-author">
+          <span class="result-name">David Khan</span>
+          <span class="result-role">Founder · Vertex Fitness</span>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- MICRO SAAS -->
-  <section class="zs-sect zs-saas" id="products">
-    <div class="zs-wrap">
-      <div class="zs-saas-hd">
-        <div class="rev">
-          <div class="zs-eye">
-            <span class="zs-eye-n">02</span>
-            <div class="zs-eye-bar"></div>
-            <span class="zs-eye-t">Micro SaaS Products</span>
-            <div class="zs-eye-dot"></div>
-          </div>
-          <h2 class="zs-sh">The Tools Inside<br><em>Your System.</em></h2>
-        </div>
-        <div class="rev d1">
-          <p class="zs-saas-note">
-            Every Zensha system comes with purpose-built components that work together to capture more leads, follow up faster, and give you total clarity on your revenue. <strong>Each tool has one job: make you more money.</strong>
-          </p>
-        </div>
+<!-- PROCESS -->
+<section class="section process" id="process">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">05</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Process</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">From audit to<br/><em>autonomous</em> in 30 days.</h2>
+    <div class="process-grid">
+      <div class="step rev d1">
+        <div class="step-num">01</div>
+        <h3 class="step-title">Discovery Audit</h3>
+        <p class="step-desc">We map your sales funnel, identify revenue leaks, and pinpoint exactly where AI delivers maximum impact.</p>
       </div>
-      <div class="zs-saas-grid" id="zs-saas-grid"></div>
-      <div class="rev d4" style="margin-top:64px;display:flex;justify-content:center;">
-        <button class="zs-btn-a" onclick="scrollToId('contact')">Get This In Your Business →</button>
+      <div class="step rev d2">
+        <div class="step-num">02</div>
+        <h3 class="step-title">System Design</h3>
+        <p class="step-desc">We architect a custom AI system around your stack — choosing the right agents, tools, and workflows for your business.</p>
+      </div>
+      <div class="step rev d3">
+        <div class="step-num">03</div>
+        <h3 class="step-title">Build & Train</h3>
+        <p class="step-desc">We deploy your AI agents, train them on your data and tone of voice, and stress-test every flow before launch.</p>
+      </div>
+      <div class="step rev d4">
+        <div class="step-num">04</div>
+        <h3 class="step-title">Launch & Optimize</h3>
+        <p class="step-desc">We go live, monitor performance in real-time, and continuously optimize for higher conversion and lower cost.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- WORK -->
-  <section class="zs-sect zs-work" id="work">
-    <div class="zs-wrap">
-      <div class="zs-work-hd rev">
-        <div>
-          <div class="zs-eye">
-            <span class="zs-eye-n">03</span>
-            <div class="zs-eye-bar"></div>
-            <span class="zs-eye-t">The Work</span>
-            <div class="zs-eye-dot"></div>
-          </div>
-          <h2 class="zs-sh">Real Systems.<br><em>Real Results.</em></h2>
-        </div>
-        <div class="zs-work-note">
-          More leads. Better conversion.<br>
-          Less manual work.<br>
-          Every time.
-        </div>
-      </div>
-      <div class="zs-cases" id="zs-cases"></div>
+<!-- FAQ -->
+<section class="section faq" id="faq">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">06</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Questions</span>
+      <span class="eyebrow-dot"></span>
     </div>
-  </section>
-
-  <!-- PROCESS -->
-  <section class="zs-sect zs-proc" id="process">
-    <div class="zs-wrap">
-      <div class="zs-proc-hd rev">
-        <div>
-          <div class="zs-eye">
-            <span class="zs-eye-n">04</span>
-            <div class="zs-eye-bar"></div>
-            <span class="zs-eye-t">Process</span>
-            <div class="zs-eye-dot"></div>
-          </div>
-          <h2 class="zs-sh">Live in 7 Days.<br><em>Growing in 14.</em></h2>
-        </div>
-        <p>From first call to fully operational revenue system in one week. Every step is designed to get you to results fast — no long agency timelines, no delays, no excuses.</p>
+    <h2 class="section-h rev d1">Frequently<br/><em>asked.</em></h2>
+    <div class="faq-list">
+      <div class="faq-item rev d1">
+        <button class="faq-q">How long until I see results?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">Most clients see measurable lift within the first 14 days post-launch. Full ROI typically lands in 30-60 days as the system optimizes and your team adapts to the new lead volume.</div></div>
       </div>
-      <div class="zs-phases" id="zs-phases"></div>
-    </div>
-  </section>
-
-  <!-- MANIFESTO -->
-  <section class="zs-sect zs-man" id="studio">
-    <div class="zs-man-glyph">Z</div>
-    <div class="zs-man-inner">
-      <div class="rev">
-        <div class="zs-eye zs-man-eye">
-          <span class="zs-eye-n">05</span>
-          <div class="zs-eye-bar"></div>
-          <span class="zs-eye-t">The Studio</span>
-          <div class="zs-eye-dot"></div>
-        </div>
-        <h2 class="zs-man-h">Built for<br>Businesses<br>That Mean It.</h2>
-        <p class="zs-man-sub">
-          We don't work with everyone. We work with business owners who are serious about growth and ready to stop leaving money on the table.
-        </p>
+      <div class="faq-item rev d2">
+        <button class="faq-q">What does it cost?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">Pricing is custom based on scope. Most engagements range from $5K-$25K for initial build, plus a monthly retainer for hosting, optimization, and support. We only take you on if we're confident in the ROI.</div></div>
       </div>
-      <div class="zs-man-lines rev d2" id="zs-manifesto"></div>
-    </div>
-  </section>
-
-  <!-- FAQ -->
-  <section class="zs-sect zs-faq" id="faq">
-    <div class="zs-faq-inner">
-      <div class="rev">
-        <div class="zs-eye">
-          <span class="zs-eye-n">07</span>
-          <div class="zs-eye-bar"></div>
-          <span class="zs-eye-t">FAQ</span>
-          <div class="zs-eye-dot"></div>
-        </div>
-        <h2 class="zs-sh">Questions That<br><em>Stop People Buying.</em></h2>
+      <div class="faq-item rev d3">
+        <button class="faq-q">Will the AI sound robotic?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">No. We use the latest generation of voice models that are virtually indistinguishable from humans. Most callers don't realize they're speaking to AI — until you tell them.</div></div>
       </div>
-      <div class="zs-faq-grid">
-        <div class="zs-faq-list rev d1">
-
-          <div class="zs-faq-item open">
-            <div class="zs-faq-q" onclick="toggleFaq(this)">
-              "I already have a website. Why do I need this?"
-              <span class="zs-faq-icon">+</span>
-            </div>
-            <div class="zs-faq-a">
-              <p>A website that doesn't generate leads is just an expensive brochure. <strong>Having a website and having a revenue system are completely different things.</strong> We audit what you have, identify exactly where you're losing clients, and either rebuild or upgrade it into a machine that converts. Most clients who come to us with existing websites are shocked at how many leads they've been leaving on the table.</p>
-            </div>
-          </div>
-
-          <div class="zs-faq-item">
-            <div class="zs-faq-q" onclick="toggleFaq(this)">
-              "How can you actually deliver in 7 days?"
-              <span class="zs-faq-icon">+</span>
-            </div>
-            <div class="zs-faq-a">
-              <p>Because we've done this dozens of times and have a proven system — not a custom process from scratch. <strong>Day 1–2: Strategy & design. Day 3–5: Build & AI setup. Day 6–7: Testing & launch.</strong> We work fast without cutting corners because our reputation depends on your results, not just your approval.</p>
-            </div>
-          </div>
-
-          <div class="zs-faq-item">
-            <div class="zs-faq-q" onclick="toggleFaq(this)">
-              "What if I don't get results?"
-              <span class="zs-faq-icon">+</span>
-            </div>
-            <div class="zs-faq-a">
-              <p>Every system we build is designed around your specific business, audience, and goals — not a generic template. <strong>We've seen clients 3–6X their lead volume consistently.</strong> That said, results depend on your traffic levels and offer quality. We're honest about this upfront — if your offer isn't right for the market, we'll tell you before we build, not after.</p>
-            </div>
-          </div>
-
-          <div class="zs-faq-item">
-            <div class="zs-faq-q" onclick="toggleFaq(this)">
-              "Isn't ₹29,999 a lot of money?"
-              <span class="zs-faq-icon">+</span>
-            </div>
-            <div class="zs-faq-a">
-              <p>If your average client is worth ₹10,000, <strong>you need just 3 extra clients to break even. That's less than one month.</strong> The Growth plan pays for itself in weeks — and then generates revenue every month after that for years. The real question is: how much are you losing every month by not having this system running right now?</p>
-            </div>
-          </div>
-
-          <div class="zs-faq-item">
-            <div class="zs-faq-q" onclick="toggleFaq(this)">
-              "Do I need to be technical to use this?"
-              <span class="zs-faq-icon">+</span>
-            </div>
-            <div class="zs-faq-a">
-              <p>Zero technical knowledge required. <strong>We handle everything — design, development, AI setup, automation configuration, and launch.</strong> You get a dashboard to see leads coming in. That's it. We built this specifically for business owners who want results, not complexity.</p>
-            </div>
-          </div>
-
-          <div class="zs-faq-item">
-            <div class="zs-faq-q" onclick="toggleFaq(this)">
-              "Why only 5 clients per week?"
-              <span class="zs-faq-icon">+</span>
-            </div>
-            <div class="zs-faq-a">
-              <p>Because <strong>diluted attention kills results.</strong> Every business we take on gets our full focus — not a junior passing it down a chain. We cap intake so that every client gets the same quality of thinking and execution. This isn't a marketing line — it's how we protect your outcome.</p>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="zs-faq-cta-side rev d2">
-          <div class="zs-faq-cta-inner">
-            <div class="zs-faq-cta-label">Still unsure?</div>
-            <div class="zs-faq-cta-h">One 30-minute call answers<br><em>everything.</em></div>
-            <div class="zs-faq-cta-sub">No pitch decks. No pressure. Just a clear, honest conversation about your business and whether we can help you grow it — fast.</div>
-            <div class="zs-faq-cta-promise">
-              <div class="zs-faq-promise-row"><div class="zs-faq-promise-dot"></div>We'll tell you exactly how many leads you're missing</div>
-              <div class="zs-faq-promise-row"><div class="zs-faq-promise-dot"></div>We'll show you the exact system that fixes it</div>
-              <div class="zs-faq-promise-row"><div class="zs-faq-promise-dot"></div>We'll give you the ROI estimate before you pay a rupee</div>
-              <div class="zs-faq-promise-row"><div class="zs-faq-promise-dot"></div>No commitment required from the call</div>
-            </div>
-            <button class="zs-btn-a" onclick="scrollToId('contact')" style="width:100%;padding:20px 0;font-size:.7rem;letter-spacing:3.5px;text-align:center;">Book My Free Growth Call →</button>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:.48rem;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;margin-top:14px;">★★★★★ 4.9/5 · Trusted by serious businesses</div>
-          </div>
-        </div>
+      <div class="faq-item rev d4">
+        <button class="faq-q">Does it integrate with my CRM?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">Yes. We integrate with all major CRMs including HubSpot, Salesforce, Pipedrive, GoHighLevel, Close, and Zoho. If you use something custom, we'll connect via API or Zapier.</div></div>
+      </div>
+      <div class="faq-item rev d5">
+        <button class="faq-q">What if it doesn't work for my industry?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">We start with a free audit specifically to determine fit. If we don't see a clear path to ROI, we'll tell you upfront. We've deployed in legal, real estate, healthcare, fitness, home services, e-commerce, and SaaS.</div></div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- CONTACT -->
-  <section class="zs-sect zs-contact" id="contact">
-    <div class="zs-contact-wrap">
-      <div class="zs-contact-hd rev">
-        <div class="zs-eye">
-          <span class="zs-eye-n">06</span>
-          <div class="zs-eye-bar"></div>
-          <span class="zs-eye-t">Contact</span>
-          <div class="zs-eye-dot"></div>
-        </div>
-        <h2 class="zs-sh">Every Day You Wait<br>Is <em>Revenue Lost.</em></h2>
-        <p>One 30-minute call is all it takes to find out exactly how many clients you're missing — and how fast we can fix that. <strong>No pitch decks. No pressure. Just a clear plan to make you more money.</strong></p>
-      </div>
-
-      <div class="zs-cg">
-        <a href="/cdn-cgi/l/email-protection#a4dec1cad7ccc5c9c1c0cdc5e4c3c9c5cdc88ac7cbc9" class="zs-cc rev d1">
-          <div class="zs-cc-type">Email</div>
-          <div class="zs-cc-icon">✉️</div>
-          <div class="zs-cc-val" style="font-size:1.15rem;"><span class="__cf_email__" data-cfemail="5329363d203b323e36373a3213343e323a3f7d303c3e">[email&#160;protected]</span></div>
-          <div class="zs-cc-sub">Project briefs, partnerships &amp; general inquiries</div>
-        </a>
-        <a href="https://instagram.com/the_zensha" target="_blank" rel="noopener noreferrer" class="zs-cc rev d2">
-          <div class="zs-cc-type">Instagram</div>
-          <div class="zs-cc-icon">📸</div>
-          <div class="zs-cc-val">@the_zensha</div>
-          <div class="zs-cc-sub">Follow our builds, work, and behind-the-scenes</div>
-        </a>
-        <a href="https://wa.me/919930563799" target="_blank" rel="noopener noreferrer" class="zs-cc rev d1">
-          <div class="zs-cc-type">Phone · WhatsApp</div>
-          <div class="zs-cc-icon">📱</div>
-          <div class="zs-cc-val">+91 99305 63799</div>
-          <div class="zs-cc-sub">Direct line — WhatsApp preferred for first contact</div>
-        </a>
-        <a href="https://wa.me/8660250803" target="_blank" rel="noopener noreferrer" class="zs-cc rev d2">
-          <div class="zs-cc-type">Alternative Line</div>
-          <div class="zs-cc-icon">📞</div>
-          <div class="zs-cc-val">866 025 0803</div>
-          <div class="zs-cc-sub">Secondary line for international inquiries</div>
-        </a>
-      </div>
-
-      <div class="rev d3" style="display:flex;flex-direction:column;align-items:center;gap:14px;margin:48px 0;">
-        <button class="zs-btn-a" onclick="scrollToId('pricing')" style="padding:22px 72px;font-size:.78rem;letter-spacing:4px;">Start Your AI System →</button>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:.5rem;letter-spacing:3px;text-transform:uppercase;color:var(--gold);font-weight:700;">⚡ Only 5 projects per week — act now</span>
-      </div>
-
-      <!-- BRIEF FORM -->
-      <div class="zs-form-wrap rev d3" id="zs-form-wrap">
-        <div class="zs-form-title">Claim Your Growth Slot</div>
-        <div class="zs-form-sub">Tell us about your business — we'll show you exactly how much revenue you're leaving on the table</div>
-        <form id="zs-form" onsubmit="handleForm(event)">
-          <div class="zs-form-grid">
-            <div class="zs-field">
-              <label>Your Name *</label>
-              <input type="text" required placeholder="John Smith" id="f-name" />
-            </div>
-            <div class="zs-field">
-              <label>Email Address *</label>
-              <input type="email" required placeholder="john@company.com" id="f-email" />
-            </div>
-            <div class="zs-field">
-              <label>Service Needed</label>
-              <select id="f-service">
-                <option value="">Select a service…</option>
-                <option>Web Development</option>
-                <option>App Development</option>
-                <option>AI Agents / Chatbots</option>
-                <option>Marketing Infrastructure</option>
-                <option>Micro SaaS Build</option>
-                <option>Full System Deployment</option>
-              </select>
-            </div>
-            <div class="zs-field">
-              <label>Budget Range</label>
-              <select id="f-budget">
-                <option value="">Select a range…</option>
-                <option>Under $5K</option>
-                <option>$5K – $15K</option>
-                <option>$15K – $50K</option>
-                <option>$50K+</option>
-                <option>Let's discuss</option>
-              </select>
-            </div>
-            <div class="zs-field full">
-              <label>Project Brief *</label>
-              <textarea required placeholder="Tell us what you're building, the problem you're solving, your timeline, and what success looks like for you…" id="f-message"></textarea>
-            </div>
+<!-- CONTACT -->
+<section class="section contact" id="contact">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">07</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Contact</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">Let's build your<br/><em>revenue engine.</em></h2>
+    <div class="contact-grid">
+      <div class="contact-info rev d1">
+        <p>Book a <strong>free 30-minute audit</strong>. We'll map your funnel, identify your biggest revenue leaks, and show you exactly where AI can move the needle — no obligation.</p>
+        <div class="contact-meta">
+          <div class="contact-meta-item">
+            <span class="contact-meta-lbl">Email</span>
+            <span class="contact-meta-val">hello@zensha.ai</span>
           </div>
-          <div class="zs-form-actions">
-            <button class="zs-btn-submit" type="submit" id="f-submit">Send Brief →</button>
-            <span class="zs-form-note">We respond within 24 hours · No spam, ever</span>
+          <div class="contact-meta-item">
+            <span class="contact-meta-lbl">Response Time</span>
+            <span class="contact-meta-val">&lt; 4 hours, business days</span>
           </div>
-        </form>
-      </div>
-
-      <div class="zs-contact-cta rev d4">
-        <div class="zs-cta-l">
-          <div class="zs-cta-h">Stop Losing Clients to Businesses That Have a Better System.</div>
-          <div class="zs-cta-sub">You have the service. You just need the engine that delivers it to the right people at the right time — automatically. That's what we build.</div>
-        </div>
-        <button class="zs-btn-dark" onclick="scrollToId('pricing')">Start Your AI System →</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer class="zs-footer">
-    <div class="zs-footer-wrap">
-      <div class="zs-foot-top">
-        <div class="zs-foot-brand">
-          <a class="zs-logo" href="#" onclick="scrollToId('hero');return false;">ZEN<em>SHA</em></a>
-          <p>We build revenue systems that bring leads, convert visitors, and close clients — on autopilot. Done in 7 days. Built to pay for itself in weeks.</p>
-        </div>
-        <div class="zs-foot-col">
-          <h5>Services</h5>
-          <ul>
-            <li><a href="#contact" onclick="scrollToId('contact');return false;">Web Development</a></li>
-            <li><a href="#contact" onclick="scrollToId('contact');return false;">App Development</a></li>
-            <li><a href="#contact" onclick="scrollToId('contact');return false;">AI Agents</a></li>
-            <li><a href="#contact" onclick="scrollToId('contact');return false;">Chatbots</a></li>
-            <li><a href="#contact" onclick="scrollToId('contact');return false;">Email Marketing</a></li>
-            <li><a href="#contact" onclick="scrollToId('contact');return false;">Social Media</a></li>
-          </ul>
-        </div>
-        <div class="zs-foot-col">
-          <h5>Products</h5>
-          <ul>
-            <li><a href="#products" onclick="scrollToId('products');return false;">InboxZen</a></li>
-            <li><a href="#products" onclick="scrollToId('products');return false;">FlowForge</a></li>
-            <li><a href="#products" onclick="scrollToId('products');return false;">MetricMind</a></li>
-            <li><a href="#products" onclick="scrollToId('products');return false;">All Products →</a></li>
-          </ul>
-        </div>
-        <div class="zs-foot-col">
-          <h5>Studio</h5>
-          <ul>
-            <li><a href="#studio"  onclick="scrollToId('studio');return false;">About</a></li>
-            <li><a href="#work"    onclick="scrollToId('work');return false;">Work</a></li>
-            <li><a href="#process" onclick="scrollToId('process');return false;">Process</a></li>
-            <li><a href="#contact" onclick="scrollToId('contact');return false;">Contact</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="zs-foot-bot">
-        <p class="zs-foot-copy">© 2026 Zensha · All Systems Operational</p>
-        <div class="zs-foot-right">
-          <a href="https://instagram.com/the_zensha" target="_blank" rel="noopener noreferrer" class="zs-foot-soc">IG</a>
-          <a href="/cdn-cgi/l/email-protection#bdc7d8d3ced5dcd0d8d9d4dcfddad0dcd4d193ded2d0" class="zs-foot-soc">EM</a>
-          <a href="https://wa.me/919930563799" target="_blank" rel="noopener noreferrer" class="zs-foot-soc">WA</a>
-          <a href="https://wa.me/8660250803" target="_blank" rel="noopener noreferrer" class="zs-foot-soc">☎</a>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-  // ─────────────────────────────────────────────────────────────
-  // DATA
-  // ─────────────────────────────────────────────────────────────
-  const TICKS = [
-    "EVERY DAY WITHOUT A SYSTEM IS REVENUE LOST",
-    "YOUR COMPETITORS ARE ALREADY WINNING WITH AI",
-    "2 MISSED CLIENTS = COST OF THIS ENTIRE SYSTEM",
-    "LEADS · CONVERSIONS · AUTOMATION · GROWTH",
-    "100 VISITORS → 8 CLIENTS. NOT 2. THAT'S THE DIFFERENCE.",
-    "BUILT TO MAKE YOU MONEY. NOT LOOK PRETTY.",
-    "24/7 AI SALES MACHINE — OR MANUAL CHAOS. YOUR CHOICE.",
-  ];
-
-  const ABILITIES = [
-    { n:"01", kw:"ATTRACT",   name:"SEO & AI Visibility",            desc:"Brings people who are already searching for what you sell — ready to buy, not just browse. Organic traffic that compounds month after month without paying for every click.",       tags:["SEO Optimization","AI Search Visibility","Google Ranking"] },
-    { n:"02", kw:"CONVERT",   name:"High-Converting Websites",       desc:"Turns every visitor into an inquiry. Not a brochure — a sales machine. Built around psychology, speed, and clear calls to action that make saying yes the easy choice.",          tags:["Conversion Design","Landing Pages","Sales Funnels"] },
-    { n:"03", kw:"CLOSE",     name:"AI Chatbot & Lead Capture",      desc:"Captures, qualifies, and follows up with every lead — even at 2AM when you're asleep. Faster response means higher close rate. Never lose a lead to slow replies again.",          tags:["AI Chatbot","Lead Qualification","24/7 Automation"] },
-    { n:"04", kw:"SCALE",     name:"Automation & Follow-Up Systems", desc:"Every lead gets followed up. Every inquiry gets nurtured. Every client gets onboarded — automatically. You remove yourself from repetitive tasks and focus only on closing.",      tags:["Workflow Automation","Email Sequences","CRM Integration"] },
-  ];
-
-  const SAAS = [
-    { icon:"🤖", name:"AI Sales Chatbot",    desc:"Captures and qualifies every lead that hits your website — 24/7, including weekends and 2AM. Answers questions, books calls, and hands off hot leads to your WhatsApp instantly. Never lose a lead to slow response again.",  badge:"Closes Leads 24/7" },
-    { icon:"⚡", name:"Automation Engine",   desc:"Eliminates the manual follow-up that kills 70% of deals. Automated email sequences, CRM updates, and client onboarding — all triggered the moment a lead comes in. Zero effort on your end.",                                  badge:"Saves 10+ Hrs/Week" },
-    { icon:"📈", name:"Growth Dashboard",    desc:"One unified view of every metric that matters — leads, conversions, revenue, traffic sources. AI-generated weekly reports tell you exactly what's working and where you're leaving money on the table.",                        badge:"Full Revenue Clarity" },
-  ];
-
-  const CASES = [
-    { id:"ZS—001", chip:"AI REVENUE SYSTEM",  title:"E-Commerce Store — AI Sales Engine That Recovered Abandoned Revenue",   problem:"1,000+ monthly visitors. Only 2% converting. ₹80,000/month in abandoned carts. Zero follow-up system. Ad spend climbing with no return.",                                                   solution:"AI chatbot trained on product catalog, deployed on checkout page. Automated cart-recovery sequences. Real-time lead qualification and WhatsApp handoff for high-intent buyers.",                                                          stack:"AI Chatbot · Checkout Integration · WhatsApp Automation · Email Sequences",          outcomes:[{n:"+38%",l:"Revenue Lift"},{n:"4X",l:"Lead Capture Rate"},{n:"₹0",l:"Extra Ad Spend"}] },
-    { id:"ZS—002", chip:"FULL AUTOMATION",    title:"Service Business — Automated Follow-Up System That Doubled Close Rate",  problem:"Leads coming in but going cold. Owner replying manually 6–12 hours later. 70% of enquiries not followed up within 24 hours. Revenue bleeding daily.",                                          solution:"Automated instant-reply system via WhatsApp + email. AI qualification bot that asks the right questions. CRM integration that tracks every lead from first touch to close.",                                                     stack:"WhatsApp Bot · CRM Automation · Email Sequences · Lead Scoring",              outcomes:[{n:"2X",l:"Close Rate"},{n:"−74%",l:"Manual Follow-Up Time"},{n:"<5 min",l:"First Response Time"}] },
-    { id:"ZS—003", chip:"LEAD GENERATION",    title:"Local Business — SEO + Conversion Overhaul That 3X'd Monthly Leads",   problem:"Spending ₹30,000/month on ads. Website converting at 1.4%. No SEO. No organic traffic. Completely dependent on paid acquisition with shrinking margins.",                              solution:"Full conversion redesign. SEO infrastructure built from scratch. AI-powered lead capture deployed. Google Business optimisation. Reduced ad dependency by 60%.",                                                      stack:"Conversion Website · On-Page SEO · AI Lead Capture · Google Optimisation",           outcomes:[{n:"3X",l:"Monthly Leads"},{n:"−60%",l:"Ad Spend"},{n:"8%",l:"Conversion Rate"}] },
-  ];
-
-  const PHASES = [
-    { n:"01", name:"Discovery",    dur:"Days 1–2",   desc:"We map your current revenue leaks — low conversion, slow follow-up, missing leads. You leave this step knowing exactly how much money you're losing and how fast we can stop it." },
-    { n:"02", name:"System Design", dur:"Days 3–4",  desc:"We architect your complete growth system — website structure, chatbot flows, automation sequences, and SEO foundations. Every component is designed to work together and compound over time." },
-    { n:"03", name:"Build & Deploy", dur:"Days 5–7", desc:"We build fast and we build clean. Your system is live within 7 days — not weeks, not 'soon'. You see real progress every single day with async updates." },
-    { n:"04", name:"Optimise",     dur:"Week 2–4",   desc:"We monitor conversions, tweak messaging, and refine automation flows based on real user behaviour. Most clients see their first extra leads within the first 2 weeks." },
-    { n:"05", name:"Scale",        dur:"Ongoing",    desc:"Your system compounds month over month. More SEO visibility. Better conversion data. Smarter automation. We don't just build and leave — we build systems that get better over time." },
-  ];
-
-  const MANIFESTO = [
-    { html:"<strong>We only take 5 projects per week — by design.</strong> Not because we can't handle more. Because diluted attention is a direct tax on your results. When we're in, we're fully in." },
-    { html:"Every system we build is engineered to generate revenue long after we leave. <strong>You're not paying for our time. You're buying a machine that makes you money every single month.</strong>" },
-    { html:"<strong>This is not for everyone.</strong> It's for business owners who understand that the right system pays for itself in weeks — and compounds for years. If that's you, we should talk." },
-  ];
-
-  // ─────────────────────────────────────────────────────────────
-  // RENDER DYNAMIC SECTIONS
-  // ─────────────────────────────────────────────────────────────
-
-  // Ticker
-  const tickAll = [...TICKS, ...TICKS].map(t => `<span class="zs-tick">${t} <span class="zs-tick-dot"> · </span></span>`).join('');
-  document.getElementById('zs-ticker-track').innerHTML = tickAll;
-
-  // Abilities
-  document.getElementById('zs-able').innerHTML = ABILITIES.map((ab, i) => `
-    <div class="zs-row rev d${i+1}" onclick="scrollToId('contact')" style="cursor:pointer;">
-      <div class="zs-row-glow"></div>
-      <div class="zs-row-n">${ab.n}</div>
-      <div class="zs-row-kw">${ab.kw}</div>
-      <div class="zs-row-body">
-        <div class="zs-row-name">${ab.name}</div>
-        <div class="zs-row-desc">${ab.desc}</div>
-        <div class="zs-tags">${ab.tags.map(t => `<span class="zs-tag">${t}</span>`).join('')}</div>
-      </div>
-      <div class="zs-row-arr">→</div>
-    </div>
-  `).join('');
-
-  // SaaS
-  document.getElementById('zs-saas-grid').innerHTML = SAAS.map((p, i) => `
-    <div class="zs-saas-card rev d${i+1}" onclick="scrollToId('contact')" style="cursor:pointer;">
-      <span class="zs-saas-icon">${p.icon}</span>
-      <div class="zs-saas-name">${p.name}</div>
-      <div class="zs-saas-desc">${p.desc}</div>
-      <div class="zs-saas-badge">${p.badge}</div>
-    </div>
-  `).join('');
-
-  // Cases
-  document.getElementById('zs-cases').innerHTML = CASES.map((c, i) => `
-    <div class="zs-case rev d${(i%2)+1}">
-      <div class="zs-case-shine"></div>
-      <div class="zs-case-mid">
-        <div class="zs-case-title">${c.title}</div>
-        <div class="zs-case-fields">
-          ${[["Problem",c.problem],["Solution",c.solution],["Stack",c.stack]].map(([l,v]) => `
-            <div>
-              <div class="zs-cf-l">${l}</div>
-              <div class="zs-cf-v">${v}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      <div class="zs-case-right">
-        ${c.outcomes.map(o => `
-          <div class="zs-out">
-            <span class="zs-out-n">${o.n}</span>
-            <span class="zs-out-l">${o.l}</span>
+          <div class="contact-meta-item">
+            <span class="contact-meta-lbl">Based In</span>
+            <span class="contact-meta-val">Remote · Global Delivery</span>
           </div>
-        `).join('')}
+        </div>
       </div>
+      <form class="contact-form rev d2" onsubmit="event.preventDefault();alert('Thanks! We\'ll be in touch within 4 hours.');this.reset();">
+        <div class="form-row">
+          <label>Full Name</label>
+          <input type="text" required placeholder="Jane Doe"/>
+        </div>
+        <div class="form-row">
+          <label>Work Email</label>
+          <input type="email" required placeholder="jane@company.com"/>
+        </div>
+        <div class="form-row">
+          <label>Company</label>
+          <input type="text" required placeholder="Company Inc."/>
+        </div>
+        <div class="form-row">
+          <label>Monthly Revenue</label>
+          <select required>
+            <option value="">Select range</option>
+            <option>Under $10K</option>
+            <option>$10K - $50K</option>
+            <option>$50K - $250K</option>
+            <option>$250K+</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>What's your biggest bottleneck?</label>
+          <textarea required placeholder="Tell us about your current sales process..."></textarea>
+        </div>
+        <button type="submit" class="btn-primary">Book Free Audit →</button>
+      </form>
     </div>
-  `).join('');
+  </div>
+</section>
 
-  // Phases
-  document.getElementById('zs-phases').innerHTML = PHASES.map((ph, i) => `
-    <div class="zs-phase rev d${i+1}">
-      <div class="zs-phase-bg"></div>
-      <div class="zs-phase-n">${ph.n}</div>
-      <div class="zs-phase-name">${ph.name}</div>
-      <div class="zs-phase-desc">${ph.desc}</div>
-      <div class="zs-phase-dur">${ph.dur}</div>
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <a href="#" class="nav-logo">ZEN<em>SHA</em></a>
+      <p>AI revenue systems for ambitious companies. We build, deploy, and optimize autonomous sales infrastructure that runs 24/7.</p>
     </div>
-  `).join('');
+    <div class="footer-col">
+      <h4>Company</h4>
+      <ul>
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#capabilities">Capabilities</a></li>
+        <li><a href="#results">Results</a></li>
+        <li><a href="#process">Process</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Resources</h4>
+      <ul>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#">Case Studies</a></li>
+        <li><a href="#">Blog</a></li>
+        <li><a href="#">Privacy</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Connect</h4>
+      <ul>
+        <li><a href="#">LinkedIn</a></li>
+        <li><a href="#">Twitter / X</a></li>
+        <li><a href="mailto:hello@zensha.ai">Email</a></li>
+        <li><a href="#contact">Book Audit</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2024 Zensha · All Systems Operational</div>
+    <div class="footer-copy">Engineered for revenue</div>
+  </div>
+</footer>
 
-  // Manifesto
-  document.getElementById('zs-manifesto').innerHTML = MANIFESTO.map(m => `
-    <div class="zs-man-line"><p>${m.html}</p></div>
-  `).join('');
+<script>
+// LOADER
+window.addEventListener('load',()=>{
+  setTimeout(()=>document.getElementById('loader').classList.add('out'),2000);
+});
 
-  // ─────────────────────────────────────────────────────────────
-  // THREE.JS — TORUS KNOT + PARTICLE FIELD
-  // ─────────────────────────────────────────────────────────────
-  (function initScene() {
-    const canvas = document.getElementById('zs-canvas');
-    const W = window.innerWidth, H = window.innerHeight;
+// CURSOR
+(function(){
+  const dot=document.getElementById('cur-dot'),ring=document.getElementById('cur-ring');
+  if(!dot)return;
+  let mx=0,my=0,rx=0,ry=0;
+  window.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
+  function tick(){rx+=(mx-rx)*.18;ry+=(my-ry)*.18;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(tick);}
+  tick();
+})();
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setSize(W, H);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
-    renderer.setClearColor(0, 0);
+// SCROLL BAR + NAV
+const nav=document.getElementById('nav'),bar=document.getElementById('zs-bar');
+window.addEventListener('scroll',()=>{
+  const s=window.scrollY,h=document.documentElement.scrollHeight-window.innerHeight;
+  bar.style.width=(s/h*100)+'%';
+  if(s>50)nav.classList.add('stuck');else nav.classList.remove('stuck');
+});
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(58, W / H, 0.1, 900);
-    camera.position.z = 88;
+// MOBILE MENU
+const ham=document.getElementById('ham'),mob=document.getElementById('mobMenu');
+ham.addEventListener('click',()=>{ham.classList.toggle('open');mob.classList.toggle('open');});
+document.querySelectorAll('.mob-link').forEach(l=>l.addEventListener('click',()=>{ham.classList.remove('open');mob.classList.remove('open');}));
 
-    const knot = new THREE.Mesh(
-      new THREE.TorusKnotGeometry(18, 5.8, 180, 18, 2, 3),
-      new THREE.MeshBasicMaterial({ color: 0xCC0000, wireframe: true, transparent: true, opacity: 0.72 })
-    );
-    knot.position.set(58, 3, -22);
-    scene.add(knot);
+// REVEAL ON SCROLL
+const io=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');});
+},{threshold:.12,rootMargin:'0px 0px -60px 0px'});
+document.querySelectorAll('.rev').forEach(el=>io.observe(el));
 
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(36, 0.8, 6, 90),
-      new THREE.MeshBasicMaterial({ color: 0xCC0000, transparent: true, opacity: 0.35 })
-    );
-    ring.position.copy(knot.position);
-    ring.rotation.x = 0.9;
-    scene.add(ring);
+// FAQ ACCORDION
+document.querySelectorAll('.faq-q').forEach(q=>{
+  q.addEventListener('click',()=>{
+    const item=q.parentElement,answer=item.querySelector('.faq-a');
+    const isOpen=item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i=>{i.classList.remove('open');i.querySelector('.faq-a').style.maxHeight=null;});
+    if(!isOpen){item.classList.add('open');answer.style.maxHeight=answer.scrollHeight+'px';}
+  });
+});
 
-    const knot2 = new THREE.Mesh(
-      new THREE.TorusKnotGeometry(22, 2.5, 120, 12, 3, 5),
-      new THREE.MeshBasicMaterial({ color: 0x880000, wireframe: true, transparent: true, opacity: 0.28 })
-    );
-    knot2.position.set(58, 3, -22);
-    scene.add(knot2);
+// SITE-WIDE WEBGL BACKGROUND (navy + red + white particles)
+(function(){
+  const canvas=document.getElementById('site-bg');
+  if(!canvas||!window.THREE)return;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,1,2000);
+  camera.position.z=600;
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth,window.innerHeight);
 
-    const N = 110;
-    const pBuf = new Float32Array(N * 3);
-    const pPos = [], pVel = [];
-    for (let i = 0; i < N; i++) {
-      const x = (Math.random() - 0.5) * 220;
-      const y = (Math.random() - 0.5) * 130;
-      const z = (Math.random() - 0.5) * 60;
-      pBuf[i*3] = x; pBuf[i*3+1] = y; pBuf[i*3+2] = z;
-      pPos.push(new THREE.Vector3(x, y, z));
-      pVel.push(new THREE.Vector3(
-        (Math.random()-0.5)*0.013,
-        (Math.random()-0.5)*0.009,
-        (Math.random()-0.5)*0.004
-      ));
-    }
-    const ptGeo = new THREE.BufferGeometry();
-    ptGeo.setAttribute("position", new THREE.BufferAttribute(pBuf, 3));
-    scene.add(new THREE.Points(ptGeo,
-      new THREE.PointsMaterial({ color: 0xCC0000, size: 1.4, transparent: true, opacity: 0.75 })
-    ));
+  const count=600;
+  const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    pos[i*3]=(Math.random()-0.5)*1800;
+    pos[i*3+1]=(Math.random()-0.5)*1200;
+    pos[i*3+2]=(Math.random()-0.5)*1200;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  // Navy blue layer
+  const matNavy=new THREE.PointsMaterial({color:0x4a6fb5,size:1.5,transparent:true,opacity:.45,sizeAttenuation:true});
+  const pointsNavy=new THREE.Points(geo,matNavy);
+  scene.add(pointsNavy);
+  // Red accents
+  const matRed=new THREE.PointsMaterial({color:0xe8001a,size:1.4,transparent:true,opacity:.4,sizeAttenuation:true});
+  const pointsRed=new THREE.Points(geo.clone(),matRed);
+  scene.add(pointsRed);
+  // White highlights
+  const matWhite=new THREE.PointsMaterial({color:0xffffff,size:.8,transparent:true,opacity:.3,sizeAttenuation:true});
+  const pointsWhite=new THREE.Points(geo.clone(),matWhite);
+  scene.add(pointsWhite);
 
-    const LMAX = 200;
-    const lBuf = new Float32Array(LMAX * 6);
-    const lGeo = new THREE.BufferGeometry();
-    lGeo.setAttribute("position", new THREE.BufferAttribute(lBuf, 3));
-    scene.add(new THREE.LineSegments(lGeo,
-      new THREE.LineBasicMaterial({ color: 0xCC0000, transparent: true, opacity: 0.28 })
-    ));
+  let mx=0,my=0;
+  window.addEventListener('mousemove',e=>{mx=(e.clientX/window.innerWidth-.5)*2;my=(e.clientY/window.innerHeight-.5)*2;});
+  window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
 
-    let mx = 0, my = 0;
-    window.addEventListener("mousemove", e => {
-      mx = e.clientX / window.innerWidth - 0.5;
-      my = e.clientY / window.innerHeight - 0.5;
-    });
+  function animate(){
+    pointsNavy.rotation.y+=.0006;pointsNavy.rotation.x+=.0003;
+    pointsRed.rotation.y+=.0008;pointsRed.rotation.x-=.0002;
+    pointsWhite.rotation.y-=.0005;pointsWhite.rotation.x+=.0002;
+    camera.position.x+=(mx*40-camera.position.x)*.03;
+    camera.position.y+=(-my*40-camera.position.y)*.03;
+    camera.lookAt(scene.position);
+    renderer.render(scene,camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
 
-    let t = 0;
-    (function tick() {
-      requestAnimationFrame(tick);
-      t += 0.0035;
+// HERO CANVAS (navy/grey grid background)
+(function(){
+  const canvas=document.getElementById('hero-canvas');
+  if(!canvas||!window.THREE)return;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(70,canvas.clientWidth/canvas.clientHeight,1,2000);
+  camera.position.set(0,80,420);
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(canvas.clientWidth,canvas.clientHeight);
 
-      knot.rotation.x  = t * 0.17;
-      knot.rotation.y  = t * 0.24;
-      knot2.rotation.x = -t * 0.12;
-      knot2.rotation.y = t * 0.19;
-      ring.rotation.z  = t * 0.07;
-      ring.rotation.y  = t * 0.04;
+  // Grid floor (navy)
+  const grid=new THREE.GridHelper(2000,40,0x2a4480,0x1a2a55);
+  grid.position.y=-150;
+  grid.material.transparent=true;
+  grid.material.opacity=.35;
+  scene.add(grid);
 
-      for (let i = 0; i < N; i++) {
-        pPos[i].add(pVel[i]);
-        if (Math.abs(pPos[i].x) > 110) pVel[i].x *= -1;
-        if (Math.abs(pPos[i].y) > 65)  pVel[i].y *= -1;
-        if (Math.abs(pPos[i].z) > 30)  pVel[i].z *= -1;
-        pBuf[i*3]   = pPos[i].x;
-        pBuf[i*3+1] = pPos[i].y;
-        pBuf[i*3+2] = pPos[i].z;
-      }
-      ptGeo.attributes.position.needsUpdate = true;
+  // White dot field
+  const pcount=300;
+  const pgeo=new THREE.BufferGeometry();
+  const ppos=new Float32Array(pcount*3);
+  for(let i=0;i<pcount;i++){
+    ppos[i*3]=(Math.random()-0.5)*900;
+    ppos[i*3+1]=(Math.random()-0.5)*600;
+    ppos[i*3+2]=(Math.random()-0.5)*600;
+  }
+  pgeo.setAttribute('position',new THREE.BufferAttribute(ppos,3));
+  const pmat=new THREE.PointsMaterial({color:0xffffff,size:1.2,transparent:true,opacity:.35,sizeAttenuation:true});
+  scene.add(new THREE.Points(pgeo,pmat));
 
-      let c = 0;
-      for (let i = 0; i < N && c < LMAX; i++) {
-        for (let j = i+1; j < N && c < LMAX; j++) {
-          if (pPos[i].distanceTo(pPos[j]) < 32) {
-            const b = c*6;
-            lBuf[b]   = pPos[i].x; lBuf[b+1] = pPos[i].y; lBuf[b+2] = pPos[i].z;
-            lBuf[b+3] = pPos[j].x; lBuf[b+4] = pPos[j].y; lBuf[b+5] = pPos[j].z;
-            c++;
-          }
-        }
-      }
-      lGeo.attributes.position.needsUpdate = true;
-      lGeo.setDrawRange(0, c * 2);
-
-      camera.position.x += (mx * 20 - camera.position.x) * 0.022;
-      camera.position.y += (-my * 12 - camera.position.y) * 0.022;
-      camera.lookAt(0, 0, 0);
-      renderer.render(scene, camera);
-    })();
-
-    window.addEventListener("resize", () => {
-      const nw = window.innerWidth, nh = window.innerHeight;
-      camera.aspect = nw / nh;
-      camera.updateProjectionMatrix();
-      renderer.setSize(nw, nh);
-    });
-  })();
-
-  // ─────────────────────────────────────────────────────────────
-  // CURSOR — adaptive colour based on background
-  // ─────────────────────────────────────────────────────────────
-  (function initCursor() {
-    const dot  = document.getElementById('zs-cur-dot');
-    const ring = document.getElementById('zs-cur-ring');
-    let rx = 0, ry = 0, ax = 0, ay = 0;
-
-    // Dark sections (black/very dark bg)
-    const DARK_SELECTORS = [
-      '.zs-pain', '.zs-footer', '#zs-loader',
-      '.zs-autopilot-cta', '.zs-conversion-block',
-      '.zs-faq-cta-side', '.zs-work'
-    ];
-    // Red/gold sections
-    const RED_SELECTORS = [
-      '.zs-ticker', '.zs-stats', '.zs-man', '.zs-contact-cta'
-    ];
-
-    // Build lookup arrays once on init
-    const darkEls = DARK_SELECTORS.flatMap(s => [...document.querySelectorAll(s)]);
-    const redEls  = RED_SELECTORS.flatMap(s  => [...document.querySelectorAll(s)]);
-
-    function getCursorMode(x, y) {
-      // Use elementFromPoint to find the topmost real element under the cursor
-      // (excluding the cursor elements themselves)
-      dot.style.visibility  = 'hidden';
-      ring.style.visibility = 'hidden';
-      const el = document.elementFromPoint(x, y);
-      dot.style.visibility  = '';
-      ring.style.visibility = '';
-      if (!el) return 'light';
-
-      // Walk up to find a section/div that sets the background
-      let node = el;
-      while (node && node !== document.body) {
-        const bg = window.getComputedStyle(node).backgroundColor;
-        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
-          // Parse RGB
-          const m = bg.match(/\d+/g);
-          if (m) {
-            const [r, g, b] = m.map(Number);
-            // Perceived luminance
-            const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-            // Red/gold hue detection: high red, low blue
-            const isReddish = r > 150 && g < 80 && b < 80;
-            if (isReddish)  return 'red';
-            if (lum < 0.35) return 'dark';
-            return 'light';
-          }
-        }
-        node = node.parentElement;
-      }
-      return 'light';
-    }
-
-    let lastMode = '';
-    let ticking = false;
-
-    window.addEventListener('mousemove', e => {
-      rx = e.clientX; ry = e.clientY;
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(() => {
-          const mode = getCursorMode(rx, ry);
-          if (mode !== lastMode) {
-            document.body.classList.remove('cursor-on-dark', 'cursor-on-red', 'cursor-on-light');
-            document.body.classList.add('cursor-on-' + mode);
-            lastMode = mode;
-          }
-          ticking = false;
-        });
-      }
-    });
-
-    (function loop() {
-      requestAnimationFrame(loop);
-      dot.style.left  = rx + 'px';
-      dot.style.top   = ry + 'px';
-      ax += (rx - ax) * 0.1;
-      ay += (ry - ay) * 0.1;
-      ring.style.left = ax + 'px';
-      ring.style.top  = ay + 'px';
-    })();
-  })();
-
-  // ─────────────────────────────────────────────────────────────
-  // SCROLL REVEAL
-  // ─────────────────────────────────────────────────────────────
-  const io = new IntersectionObserver(
-    entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("vis"); }),
-    { threshold: 0.065 }
-  );
-  document.querySelectorAll(".rev").forEach(el => io.observe(el));
-
-  // ─────────────────────────────────────────────────────────────
-  // PROGRESS BAR
-  // ─────────────────────────────────────────────────────────────
-  const bar = document.getElementById('zs-bar');
-  window.addEventListener("scroll", () => {
-    const total = document.documentElement.scrollHeight - window.innerHeight;
-    bar.style.width = (window.scrollY / total * 100) + "%";
-  }, { passive: true });
-
-  // ─────────────────────────────────────────────────────────────
-  // STUCK NAV
-  // ─────────────────────────────────────────────────────────────
-  const nav = document.getElementById('zs-nav');
-  window.addEventListener("scroll", () => {
-    nav.classList.toggle("stuck", window.scrollY > 60);
-  }, { passive: true });
-
-  // ─────────────────────────────────────────────────────────────
-  // LOADER
-  // ─────────────────────────────────────────────────────────────
-  setTimeout(() => {
-    document.getElementById('zs-loader').classList.add('hide');
-  }, 2200);
-
-  // ─────────────────────────────────────────────────────────────
-  // MOBILE MENU
-  // ─────────────────────────────────────────────────────────────
-  const hamburger   = document.getElementById('zs-hamburger');
-  const mobileMenu  = document.getElementById('zs-mobile-menu');
-  let menuOpen = false;
-
-  hamburger.addEventListener('click', () => {
-    menuOpen = !menuOpen;
-    hamburger.classList.toggle('open', menuOpen);
-    mobileMenu.classList.toggle('open', menuOpen);
-    document.body.style.overflow = menuOpen ? 'hidden' : '';
+  let mx=0,my=0;
+  window.addEventListener('mousemove',e=>{mx=(e.clientX/window.innerWidth-.5)*2;my=(e.clientY/window.innerHeight-.5)*2;});
+  window.addEventListener('resize',()=>{
+    camera.aspect=canvas.clientWidth/canvas.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(canvas.clientWidth,canvas.clientHeight);
   });
 
-  // ─────────────────────────────────────────────────────────────
-  // SCROLL TO
-  // ─────────────────────────────────────────────────────────────
-  function scrollToId(id) {
-    if (menuOpen) {
-      menuOpen = false;
-      hamburger.classList.remove('open');
-      mobileMenu.classList.remove('open');
-      document.body.style.overflow = '';
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }, 350);
-    } else {
-      const el = document.getElementById(id);
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
+  function animate(){
+    grid.rotation.y+=.001;
+    camera.position.x+=(mx*60-camera.position.x)*.05;
+    camera.position.y+=(80+(-my*40)-camera.position.y)*.05;
+    camera.lookAt(scene.position);
+    renderer.render(scene,camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// 3D MODEL — interactive icosahedron with navy + red + white materials
+(function(){
+  const canvas=document.getElementById('model-canvas');
+  if(!canvas||!window.THREE)return;
+  const scene=new THREE.Scene();
+  const w=canvas.clientWidth||500,h=canvas.clientHeight||500;
+  const camera=new THREE.PerspectiveCamera(50,w/h,.1,1000);
+  camera.position.z=5;
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(w,h);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff,.4));
+  const navyLight=new THREE.DirectionalLight(0x4a7fff,1.2);
+  navyLight.position.set(-3,2,4);
+  scene.add(navyLight);
+  const redLight=new THREE.PointLight(0xe8001a,2,10);
+  redLight.position.set(3,-1,2);
+  scene.add(redLight);
+  const whiteLight=new THREE.DirectionalLight(0xffffff,.6);
+  whiteLight.position.set(2,4,3);
+  scene.add(whiteLight);
+
+  const group=new THREE.Group();
+  scene.add(group);
+
+  // Core icosahedron - navy with grey
+  const coreGeo=new THREE.IcosahedronGeometry(1.2,1);
+  const coreMat=new THREE.MeshStandardMaterial({
+    color:0x1a2a55,
+    metalness:.85,
+    roughness:.25,
+    emissive:0x0a1530,
+    emissiveIntensity:.3,
+    flatShading:true
+  });
+  const core=new THREE.Mesh(coreGeo,coreMat);
+  group.add(core);
+
+  // Wireframe overlay - white
+  const wireGeo=new THREE.IcosahedronGeometry(1.22,1);
+  const wireMat=new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.18});
+  group.add(new THREE.Mesh(wireGeo,wireMat));
+
+  // Outer wireframe - red
+  const outerGeo=new THREE.IcosahedronGeometry(1.8,1);
+  const outerMat=new THREE.MeshBasicMaterial({color:0xe8001a,wireframe:true,transparent:true,opacity:.4});
+  const outer=new THREE.Mesh(outerGeo,outerMat);
+  group.add(outer);
+
+  // Outer dodecahedron - grey/navy
+  const dodecGeo=new THREE.DodecahedronGeometry(2.3,0);
+  const dodecMat=new THREE.MeshBasicMaterial({color:0x4a6fb5,wireframe:true,transparent:true,opacity:.22});
+  const dodec=new THREE.Mesh(dodecGeo,dodecMat);
+  group.add(dodec);
+
+  // Floating accent points
+  const pcount=80;
+  const pgeo=new THREE.BufferGeometry();
+  const ppos=new Float32Array(pcount*3);
+  for(let i=0;i<pcount;i++){
+    const r=2.6+Math.random()*.6;
+    const t=Math.random()*Math.PI*2;
+    const p=Math.acos(2*Math.random()-1);
+    ppos[i*3]=r*Math.sin(p)*Math.cos(t);
+    ppos[i*3+1]=r*Math.sin(p)*Math.sin(t);
+    ppos[i*3+2]=r*Math.cos(p);
+  }
+  pgeo.setAttribute('position',new THREE.BufferAttribute(ppos,3));
+  const pmat=new THREE.PointsMaterial({color:0xffffff,size:.05,transparent:true,opacity:.85});
+  const points=new THREE.Points(pgeo,pmat);
+  group.add(points);
+
+  // Red accent points
+  const pcount2=30;
+  const pgeo2=new THREE.BufferGeometry();
+  const ppos2=new Float32Array(pcount2*3);
+  for(let i=0;i<pcount2;i++){
+    const r=2.0+Math.random()*.8;
+    const t=Math.random()*Math.PI*2;
+    const p=Math.acos(2*Math.random()-1);
+    ppos2[i*3]=r*Math.sin(p)*Math.cos(t);
+    ppos2[i*3+1]=r*Math.sin(p)*Math.sin(t);
+    ppos2[i*3+2]=r*Math.cos(p);
+  }
+  pgeo2.setAttribute('position',new THREE.BufferAttribute(ppos2,3));
+  const pmat2=new THREE.PointsMaterial({color:0xe8001a,size:.08,transparent:true,opacity:.9});
+  const points2=new THREE.Points(pgeo2,pmat2);
+  group.add(points2);
+
+  let mx=0,my=0,tx=0,ty=0;
+  canvas.parentElement.addEventListener('mousemove',e=>{
+    const r=canvas.getBoundingClientRect();
+    mx=((e.clientX-r.left)/r.width-.5)*2;
+    my=((e.clientY-r.top)/r.height-.5)*2;
+  });
+  canvas.parentElement.addEventListener('mouseleave',()=>{mx=0;my=0;});
+
+  function resize(){
+    const w=canvas.clientWidth,h=canvas.clientHeight;
+    camera.aspect=w/h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w,h,false);
+  }
+  window.addEventListener('resize',resize);
+  resize();
+
+  let t=0;
+  function animate(){
+    t+=.01;
+    tx+=(mx*.6-tx)*.06;
+    ty+=(my*.6-ty)*.06;
+    group.rotation.y+=.004;
+    group.rotation.x=ty*.3;
+    group.rotation.z=tx*.15;
+    core.rotation.x-=.003;
+    core.rotation.y-=.002;
+    outer.rotation.x+=.002;
+    outer.rotation.z+=.003;
+    dodec.rotation.y-=.0015;
+    dodec.rotation.x+=.0008;
+    points.rotation.y-=.002;
+    points2.rotation.y+=.003;
+    points2.rotation.x+=.001;
+    // Subtle scale breathe
+    const s=1+Math.sin(t)*.02;
+    group.scale.set(s,s,s);
+    renderer.render(scene,camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// HERO PARALLAX
+const heroBody=document.querySelector('.hero-body');
+window.addEventListener('scroll',()=>{
+  const s=window.scrollY;
+  if(s<window.innerHeight&&heroBody){
+    heroBody.style.transform=`translateY(${s*0.18}px)`;
+    heroBody.style.opacity=Math.max(0,1-s/(window.innerHeight*.85));
+  }
+});
+
+// PROBLEM CARDS 3D TILT
+document.querySelectorAll('.problem-card').forEach(card=>{
+  card.addEventListener('mousemove',e=>{
+    const r=card.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width-.5;
+    const y=(e.clientY-r.top)/r.height-.5;
+    card.style.transform=`rotateY(${x*8}deg) rotateX(${-y*8}deg) translateZ(10px)`;
+  });
+  card.addEventListener('mouseleave',()=>{card.style.transform='';});
+});
+
+// SMOOTH ANCHOR SCROLL OFFSET
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    const id=a.getAttribute('href');
+    if(id.length>1){
+      const t=document.querySelector(id);
+      if(t){e.preventDefault();window.scrollTo({top:t.offsetTop-60,behavior:'smooth'});}
     }
-  }
+  });
+});
+</script>
 
-  // ─────────────────────────────────────────────────────────────
-  // FORM SUBMIT
-  // ─────────────────────────────────────────────────────────────
-  async function handleForm(e) {
-    e.preventDefault();
-    const btn = document.getElementById('f-submit');
-    btn.disabled = true;
-    btn.textContent = 'Sending…';
-    await new Promise(r => setTimeout(r, 1400));
-    const wrap = document.getElementById('zs-form-wrap');
-    wrap.innerHTML = `
-      <div class="zs-form-success">
-        <div class="zs-form-success-icon">✓</div>
-        <h3>Brief Received.</h3>
-        <p>We'll review your project and respond within 24 hours with a clear plan. Check your inbox — something good is coming.</p>
-      </div>
-    `;
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // FAQ TOGGLE
-  // ─────────────────────────────────────────────────────────────
-  function toggleFaq(el) {
-    const item = el.parentElement;
-    const isOpen = item.classList.contains('open');
-    document.querySelectorAll('.zs-faq-item').forEach(i => i.classList.remove('open'));
-    if (!isOpen) item.classList.add('open');
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // STATS COUNTER ANIMATION
-  // ─────────────────────────────────────────────────────────────
-  (function initCounters() {
-    const counters = document.querySelectorAll('[data-count]');
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        const el = entry.target;
-        const target = parseInt(el.dataset.count);
-        const suffix = el.dataset.suffix || '';
-        let start = 0;
-        const duration = 1600;
-        const step = duration / target;
-        const timer = setInterval(() => {
-          start++;
-          el.textContent = start + suffix;
-          if (start >= target) clearInterval(timer);
-        }, step);
-        io.unobserve(el);
-      });
-    }, { threshold: 0.5 });
-    counters.forEach(c => io.observe(c));
-  })();
-
-  </script>
 </body>
 </html>
