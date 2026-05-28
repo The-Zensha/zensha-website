@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ZENSHA — AI Revenue Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  /* NEW PALETTE: Navy Blue · Grey · Black · White · Red */
+  --void:#05070d;            /* near-black with navy hint */
+  --deep:#0a1020;            /* deep navy */
+  --navy:#101a33;            /* navy blue */
+  --navy-2:#162447;          /* lighter navy */
+  --surface:#1a1f2e;         /* dark grey-blue */
+  --lift:#222838;            /* lifted grey */
+  --grey:#2a3142;            /* mid grey */
+  --grey-lt:#3d4456;         /* lighter grey */
+  --red:#e8001a;
+  --red-glow:rgba(232,0,26,.18);
+  --red-lo:rgba(232,0,26,.06);
+  --red-hi:rgba(232,0,26,.55);
+  --white:#f4f6fa;
+  --muted:rgba(244,246,250,.55);
+  --dim:rgba(244,246,250,.28);
+  --edge:rgba(180,200,230,.09);
+  --edge-b:rgba(80,120,200,.22);   /* navy edge */
+  --edge-r:rgba(232,0,26,.22);
+  --font-display:'Bebas Neue',sans-serif;
+  --font-body:'Outfit',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--void);color:var(--white);font-family:var(--font-body);overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+::selection{background:var(--red);color:#fff;}
+
+#site-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;}
+
+@media(hover:hover){
+  *{cursor:none!important;}
+  #cur-dot{position:fixed;width:6px;height:6px;background:var(--red);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:width .12s,height .12s,opacity .15s;will-change:left,top;}
+  #cur-ring{position:fixed;width:28px;height:28px;border:1px solid rgba(232,0,26,.5);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .3s cubic-bezier(.16,1,.3,1),height .3s cubic-bezier(.16,1,.3,1);will-change:left,top;}
+  body:has(a:hover) #cur-ring,body:has(button:hover) #cur-ring{width:48px;height:48px;}
+}
+@media(hover:none){#cur-dot,#cur-ring{display:none;}}
+
+#zs-bar{position:fixed;top:0;left:0;height:2px;width:0%;background:linear-gradient(90deg,var(--red),#ff4444);z-index:800;box-shadow:0 0 12px var(--red-hi);transition:width .08s linear;}
+
+/* LOADER */
+#loader{position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#000 0%,var(--navy) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .8s ease,visibility .8s;}
+#loader.out{opacity:0;visibility:hidden;}
+.ld-logo{font-family:var(--font-display);font-size:clamp(3rem,9vw,7rem);letter-spacing:16px;color:#fff;overflow:hidden;}
+.ld-logo em{color:var(--red);font-style:normal;}
+.ld-logo span{display:inline-block;opacity:0;transform:translateY(60px);animation:ldIn .6s cubic-bezier(.16,1,.3,1) forwards;}
+.ld-logo span:nth-child(1){animation-delay:.04s}.ld-logo span:nth-child(2){animation-delay:.08s}.ld-logo span:nth-child(3){animation-delay:.12s}
+.ld-logo span:nth-child(4){animation-delay:.18s}.ld-logo span:nth-child(5){animation-delay:.23s}.ld-logo span:nth-child(6){animation-delay:.28s}
+@keyframes ldIn{to{opacity:1;transform:translateY(0)}}
+.ld-bar{width:min(280px,65vw);height:1px;background:rgba(255,255,255,.1);overflow:hidden;}
+.ld-fill{height:100%;background:var(--red);animation:ldFill 1.9s cubic-bezier(.4,0,.2,1) forwards;}
+@keyframes ldFill{from{width:0}to{width:100%}}
+.ld-sub{font-family:var(--font-mono);font-size:.48rem;letter-spacing:5px;text-transform:uppercase;color:rgba(255,255,255,.3);}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:600;display:flex;align-items:center;justify-content:space-between;padding:36px 80px;transition:padding .5s,background .5s,border-color .5s;border-bottom:1px solid transparent;}
+.nav.stuck{padding:16px 80px;background:rgba(10,16,32,.92);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-color:var(--edge-b);}
+.nav-logo{font-family:var(--font-display);font-size:1.6rem;letter-spacing:10px;color:#fff;text-decoration:none;}
+.nav-logo em{color:var(--red);font-style:normal;}
+.nav-links{display:flex;gap:44px;}
+.nav-links a{font-family:var(--font-mono);font-size:.5rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .3s;position:relative;}
+.nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:var(--red);transition:width .3s;}
+.nav-links a:hover{color:#fff;}.nav-links a:hover::after{width:100%;}
+.nav-cta{font-family:var(--font-mono);font-size:.52rem;letter-spacing:3px;text-transform:uppercase;background:var(--red);color:#fff;border:none;padding:12px 28px;position:relative;overflow:hidden;transition:box-shadow .3s;}
+.nav-cta::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.12);transform:translateX(-101%);transition:transform .35s cubic-bezier(.16,1,.3,1);}
+.nav-cta:hover::after{transform:translateX(0);}.nav-cta:hover{box-shadow:0 0 36px var(--red-hi);}
+
+.ham{display:none;flex-direction:column;gap:5px;background:none;border:none;padding:8px;z-index:601;}
+.ham span{display:block;width:22px;height:1.5px;background:#fff;transition:transform .35s,opacity .25s;}
+.ham.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg);}
+.ham.open span:nth-child(2){opacity:0;}
+.ham.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg);}
+.mob-menu{display:none;position:fixed;inset:0;z-index:599;background:rgba(10,16,32,.97);backdrop-filter:blur(24px);flex-direction:column;align-items:center;justify-content:center;gap:0;opacity:0;visibility:hidden;transition:opacity .4s,visibility .4s;}
+.mob-menu.open{opacity:1;visibility:visible;}
+.mob-link{font-family:var(--font-display);font-size:clamp(2.5rem,8vw,4rem);letter-spacing:4px;color:#fff;text-decoration:none;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06);width:min(380px,80vw);text-align:center;opacity:0;transform:translateY(18px);transition:color .25s,opacity .45s,transform .45s;}
+.mob-menu.open .mob-link{opacity:1;transform:translateY(0);}
+.mob-menu.open .mob-link:nth-child(1){transition-delay:.06s}.mob-menu.open .mob-link:nth-child(2){transition-delay:.11s}
+.mob-menu.open .mob-link:nth-child(3){transition-delay:.16s}.mob-menu.open .mob-link:nth-child(4){transition-delay:.21s}
+.mob-link:hover{color:var(--red);}
+
+/* HERO — now with 3D model showcase */
+.hero{position:relative;min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr;align-items:center;overflow:hidden;background:linear-gradient(135deg,var(--void) 0%,var(--deep) 60%,var(--navy) 100%);}
+#hero-canvas{position:absolute;inset:0;z-index:0;}
+.hero-veil{position:absolute;inset:0;z-index:1;background:linear-gradient(105deg,rgba(5,7,13,.85) 30%,rgba(5,7,13,.0) 100%),linear-gradient(to top,rgba(5,7,13,.98) 0%,transparent 22%),radial-gradient(ellipse 55% 65% at 78% 50%,rgba(232,0,26,.06),transparent 60%),radial-gradient(ellipse 50% 60% at 20% 30%,rgba(22,36,71,.4),transparent 60%);pointer-events:none;}
+.hero-body{position:relative;z-index:2;padding:120px 0 60px 80px;max-width:680px;will-change:transform;}
+.hero-eyebrow{display:flex;align-items:center;gap:16px;margin-bottom:44px;opacity:0;animation:slideUp .8s cubic-bezier(.16,1,.3,1) .25s forwards;}
+.hero-eyebrow-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 2.5s ease infinite;}
+.hero-eyebrow-txt{font-family:var(--font-mono);font-size:.5rem;letter-spacing:4px;text-transform:uppercase;color:var(--red);}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 var(--red-hi)}50%{box-shadow:0 0 0 6px transparent}}
+.hero-h1{font-family:var(--font-display);font-size:clamp(3rem,6.5vw,8rem);line-height:.92;letter-spacing:2px;color:#fff;margin-bottom:36px;opacity:0;animation:slideUp 1s cubic-bezier(.16,1,.3,1) .38s forwards;text-shadow:0 4px 40px rgba(232,0,26,.15);}
+.hero-h1 .red{color:var(--red);text-shadow:0 4px 50px rgba(232,0,26,.5);}
+.hero-h1 .outline{-webkit-text-stroke:1.5px rgba(255,255,255,.28);color:transparent;}
+.hero-h1 .navy{color:#7c92c4;}
+.hero-sub{font-size:1.05rem;font-weight:300;line-height:1.85;color:var(--muted);max-width:500px;margin-bottom:52px;opacity:0;animation:slideUp 1s cubic-bezier(.16,1,.3,1) .52s forwards;}
+.hero-sub strong{color:#fff;font-weight:600;}
+.hero-btns{display:flex;gap:14px;flex-wrap:wrap;opacity:0;animation:slideUp 1s cubic-bezier(.16,1,.3,1) .66s forwards;}
+.btn-primary{font-family:var(--font-mono);font-size:.56rem;letter-spacing:3.5px;text-transform:uppercase;background:var(--red);color:#fff;border:none;padding:18px 48px;position:relative;overflow:hidden;transition:box-shadow .35s;}
+.btn-primary::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.14);transform:translateX(-101%);transition:transform .38s cubic-bezier(.16,1,.3,1);}
+.btn-primary:hover::after{transform:translateX(0);}.btn-primary:hover{box-shadow:0 0 48px var(--red-hi);}
+.btn-ghost{font-family:var(--font-mono);font-size:.56rem;letter-spacing:3.5px;text-transform:uppercase;background:transparent;color:var(--muted);border:1px solid var(--edge-b);padding:18px 48px;transition:color .3s,border-color .3s,background .3s;}
+.btn-ghost:hover{color:#fff;border-color:var(--edge-r);background:rgba(232,0,26,.04);}
+
+/* 3D MODEL SHOWCASE */
+.hero-3d{position:relative;z-index:2;height:100vh;min-height:700px;display:flex;align-items:center;justify-content:center;padding:0 60px 0 0;opacity:0;animation:slideUp 1.2s cubic-bezier(.16,1,.3,1) .8s forwards;}
+.hero-3d-frame{position:relative;width:100%;max-width:560px;aspect-ratio:1;}
+#model-canvas{position:absolute;inset:0;width:100%;height:100%;}
+.hero-3d-ring{position:absolute;inset:-30px;border:1px solid var(--edge-b);border-radius:50%;animation:ringSpin 40s linear infinite;}
+.hero-3d-ring::before{content:'';position:absolute;top:-3px;left:50%;width:6px;height:6px;background:var(--red);border-radius:50%;box-shadow:0 0 12px var(--red);}
+.hero-3d-ring2{position:absolute;inset:-60px;border:1px dashed rgba(124,146,196,.18);border-radius:50%;animation:ringSpin 60s linear infinite reverse;}
+@keyframes ringSpin{to{transform:rotate(360deg);}}
+.hero-3d-corners{position:absolute;inset:-20px;pointer-events:none;}
+.hero-3d-corners::before,.hero-3d-corners::after{content:'';position:absolute;width:24px;height:24px;border-color:var(--red);border-style:solid;}
+.hero-3d-corners::before{top:0;left:0;border-width:1px 0 0 1px;}
+.hero-3d-corners::after{bottom:0;right:0;border-width:0 1px 1px 0;}
+.hero-3d-label{position:absolute;bottom:-50px;left:0;right:0;text-align:center;font-family:var(--font-mono);font-size:.5rem;letter-spacing:5px;text-transform:uppercase;color:var(--dim);}
+.hero-3d-label em{color:var(--red);font-style:normal;}
+
+.hero-scroll{position:absolute;left:80px;bottom:60px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;animation:fadeIn .9s ease 1.2s forwards;}
+.hero-scroll-line{width:1px;height:56px;background:linear-gradient(to bottom,var(--red),transparent);animation:scrollPulse 2.2s ease infinite;}
+@keyframes scrollPulse{0%{transform:scaleY(0);transform-origin:top;opacity:1}49%{transform:scaleY(1);transform-origin:top;opacity:1}50%{transform:scaleY(1);transform-origin:bottom;opacity:1}100%{transform:scaleY(0);transform-origin:bottom;opacity:0}}
+.hero-scroll-lbl{font-family:var(--font-mono);font-size:.44rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim);writing-mode:vertical-rl;transform:rotate(180deg);}
+@keyframes slideUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.ticker{background:var(--red);overflow:hidden;padding:12px 0;position:relative;z-index:2;}
+.ticker-track{display:inline-flex;white-space:nowrap;animation:tickRun 28s linear infinite;}
+.ticker-track:hover{animation-play-state:paused;}
+@keyframes tickRun{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tick-item{font-family:var(--font-mono);font-size:.55rem;letter-spacing:5px;text-transform:uppercase;color:#fff;padding:0 32px;}
+.tick-dot{color:rgba(255,255,255,.35);}
+
+.section{padding:140px 80px;position:relative;overflow:hidden;}
+.wrap{max-width:1280px;margin:0 auto;position:relative;z-index:2;}
+
+.section::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;}
+.problem::before{background:linear-gradient(to bottom,rgba(5,7,13,.94),rgba(10,16,32,.92));}
+.caps::before{background:linear-gradient(to bottom,rgba(10,16,32,.92),rgba(16,26,51,.85));}
+.benefits::before{background:linear-gradient(to bottom,rgba(16,26,51,.88),rgba(10,16,32,.92));}
+.results::before{background:linear-gradient(to bottom,rgba(10,16,32,.9),rgba(5,7,13,.94));}
+.process::before{background:linear-gradient(to bottom,rgba(5,7,13,.94),rgba(16,26,51,.88));}
+.faq::before{background:linear-gradient(to bottom,rgba(16,26,51,.88),rgba(10,16,32,.94));}
+.contact::before{background:linear-gradient(to bottom,rgba(10,16,32,.92),rgba(5,7,13,.95));}
+
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:24px;}
+.eyebrow-num{font-family:var(--font-mono);font-size:.48rem;letter-spacing:2px;color:var(--dim);}
+.eyebrow-line{width:1px;height:16px;background:rgba(255,255,255,.15);}
+.eyebrow-txt{font-family:var(--font-mono);font-size:.48rem;letter-spacing:4px;text-transform:uppercase;color:var(--dim);}
+.eyebrow-dot{width:4px;height:4px;border-radius:50%;background:var(--red);}
+.section-h{font-family:var(--font-display);font-size:clamp(3rem,6vw,7.5rem);line-height:.9;letter-spacing:1px;color:#fff;}
+.section-h em{color:var(--red);font-style:normal;}
+.section-h .dim-txt{color:rgba(255,255,255,.22);}
+.section-h .navy-txt{color:#7c92c4;}
+
+.rev{opacity:0;transform:translateY(32px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1);}
+.rev.vis{opacity:1;transform:translateY(0);}
+.rev.d1{transition-delay:.07s}.rev.d2{transition-delay:.18s}.rev.d3{transition-delay:.29s}
+.rev.d4{transition-delay:.40s}.rev.d5{transition-delay:.51s}.rev.d6{transition-delay:.62s}
+
+/* PROBLEM */
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-top:72px;perspective:1400px;}
+.problem-card{background:linear-gradient(145deg,rgba(16,26,51,.7),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:52px 44px;position:relative;overflow:hidden;transition:border-color .4s,background .4s;transform-style:preserve-3d;will-change:transform;}
+.problem-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--red);transform:scaleX(0);transform-origin:left;transition:transform .5s cubic-bezier(.16,1,.3,1);}
+.problem-card:hover{border-color:var(--edge-r);background:linear-gradient(145deg,rgba(22,36,71,.8),rgba(16,26,51,.92));}
+.problem-card:hover::before{transform:scaleX(1);}
+.problem-icon{font-size:1.6rem;margin-bottom:20px;display:block;}
+.problem-title{font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem;color:#fff;margin-bottom:10px;line-height:1.3;}
+.problem-desc{font-size:.84rem;color:var(--muted);line-height:1.78;}
+.problem-desc strong{color:rgba(232,0,26,.85);font-weight:600;}
+.problem-cta-band{margin-top:2px;background:linear-gradient(145deg,rgba(22,36,71,.8),rgba(16,26,51,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:52px 60px;display:flex;align-items:center;justify-content:space-between;gap:60px;flex-wrap:wrap;}
+.problem-cta-txt{font-family:var(--font-display);font-size:clamp(1.8rem,3.5vw,3.5rem);color:#fff;line-height:1.0;letter-spacing:1px;}
+.problem-cta-txt em{color:var(--red);font-style:normal;}
+
+/* SOLUTION INTRO */
+.solution-intro{background:transparent;padding:120px 80px;position:relative;overflow:hidden;}
+.solution-intro::before{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(10,16,32,.92),rgba(16,26,51,.92)),radial-gradient(ellipse 60% 55% at 50% 0%,rgba(232,0,26,.09),transparent 60%),radial-gradient(ellipse 50% 40% at 50% 100%,rgba(124,146,196,.08),transparent 60%);pointer-events:none;}
+.sol-center{max-width:1280px;margin:0 auto;text-align:center;position:relative;z-index:1;}
+.sol-tag{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:.5rem;letter-spacing:4px;text-transform:uppercase;color:var(--red);margin-bottom:32px;}
+.sol-tag::before,.sol-tag::after{content:'';width:24px;height:1px;background:var(--red);}
+.sol-h{font-family:var(--font-display);font-size:clamp(2.8rem,6vw,7rem);line-height:.92;letter-spacing:1px;color:#fff;margin-bottom:28px;}
+.sol-h em{color:var(--red);font-style:normal;}
+.sol-h .out{-webkit-text-stroke:1px rgba(255,255,255,.2);color:transparent;}
+.sol-p{font-size:1rem;font-weight:300;line-height:1.9;color:var(--muted);max-width:640px;margin:0 auto;}
+.sol-p strong{color:#fff;font-weight:600;}
+
+/* CAPABILITIES */
+.caps-header{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:end;margin-bottom:80px;}
+.caps-intro{font-size:1rem;color:var(--muted);line-height:1.85;max-width:480px;}
+.caps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
+.cap-card{background:linear-gradient(160deg,rgba(22,36,71,.5),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:48px 36px;position:relative;overflow:hidden;transition:border-color .4s,background .4s,transform .4s;min-height:340px;display:flex;flex-direction:column;}
+.cap-card:hover{border-color:var(--edge-r);background:linear-gradient(160deg,rgba(34,52,100,.6),rgba(16,26,51,.92));transform:translateY(-4px);}
+.cap-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--red),transparent);transform:scaleX(0);transition:transform .5s;}
+.cap-card:hover::after{transform:scaleX(1);}
+.cap-num{font-family:var(--font-mono);font-size:.48rem;letter-spacing:2px;color:var(--dim);margin-bottom:24px;}
+.cap-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:rgba(232,0,26,.08);border:1px solid var(--edge-r);margin-bottom:24px;font-size:1.4rem;}
+.cap-title{font-family:var(--font-display);font-size:1.6rem;letter-spacing:1px;color:#fff;margin-bottom:14px;line-height:1.1;}
+.cap-desc{font-size:.85rem;color:var(--muted);line-height:1.8;flex-grow:1;}
+.cap-tag{margin-top:24px;display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:.44rem;letter-spacing:2px;text-transform:uppercase;color:var(--red);}
+
+/* BENEFITS */
+.benefits-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:72px;}
+.benefit{background:linear-gradient(170deg,rgba(22,36,71,.55),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:44px 32px;transition:border-color .4s,background .4s;position:relative;}
+.benefit:hover{border-color:var(--edge-r);background:linear-gradient(170deg,rgba(34,52,100,.65),rgba(16,26,51,.92));}
+.benefit-num{font-family:var(--font-display);font-size:3.5rem;color:var(--red);letter-spacing:1px;line-height:1;margin-bottom:18px;}
+.benefit-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:.92rem;color:#fff;margin-bottom:10px;}
+.benefit-desc{font-size:.78rem;color:var(--muted);line-height:1.75;}
+
+/* RESULTS */
+.results-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:72px;}
+.result-card{background:linear-gradient(155deg,rgba(16,26,51,.7),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:48px 38px;transition:border-color .4s,background .4s;}
+.result-card:hover{border-color:var(--edge-r);background:linear-gradient(155deg,rgba(22,36,71,.8),rgba(16,26,51,.92));}
+.result-quote{font-family:var(--font-display);font-size:1.8rem;color:var(--red);line-height:1;margin-bottom:18px;}
+.result-text{font-size:.92rem;color:#fff;line-height:1.7;margin-bottom:28px;font-weight:300;}
+.result-author{display:flex;flex-direction:column;gap:4px;padding-top:20px;border-top:1px solid var(--edge-b);}
+.result-name{font-family:var(--font-mono);font-size:.6rem;letter-spacing:2px;color:#fff;text-transform:uppercase;}
+.result-role{font-family:var(--font-mono);font-size:.5rem;letter-spacing:2px;color:var(--dim);text-transform:uppercase;}
+
+/* PROCESS */
+.process-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:72px;}
+.step{background:linear-gradient(170deg,rgba(22,36,71,.55),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:44px 32px;position:relative;transition:border-color .4s,background .4s;}
+.step:hover{border-color:var(--edge-r);background:linear-gradient(170deg,rgba(34,52,100,.65),rgba(16,26,51,.92));}
+.step-num{font-family:var(--font-display);font-size:4rem;color:rgba(232,0,26,.3);letter-spacing:1px;line-height:1;margin-bottom:24px;}
+.step-title{font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem;color:#fff;margin-bottom:12px;}
+.step-desc{font-size:.82rem;color:var(--muted);line-height:1.78;}
+
+/* FAQ */
+.faq-list{margin-top:72px;display:flex;flex-direction:column;gap:2px;}
+.faq-item{background:linear-gradient(145deg,rgba(16,26,51,.7),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);transition:border-color .4s,background .4s;}
+.faq-item.open{border-color:var(--edge-r);background:linear-gradient(145deg,rgba(22,36,71,.8),rgba(16,26,51,.92));}
+.faq-q{width:100%;background:none;border:none;text-align:left;padding:28px 36px;display:flex;align-items:center;justify-content:space-between;gap:24px;font-family:'Outfit',sans-serif;font-weight:500;font-size:.95rem;color:#fff;}
+.faq-icon{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--red);font-size:1.2rem;transition:transform .35s;flex-shrink:0;}
+.faq-item.open .faq-icon{transform:rotate(45deg);}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.16,1,.3,1);}
+.faq-a-inner{padding:0 36px 28px;font-size:.88rem;color:var(--muted);line-height:1.8;}
+
+/* CONTACT */
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:72px;align-items:start;}
+.contact-info p{font-size:1rem;color:var(--muted);line-height:1.85;margin-bottom:32px;max-width:440px;}
+.contact-info p strong{color:#fff;}
+.contact-meta{display:flex;flex-direction:column;gap:18px;}
+.contact-meta-item{display:flex;flex-direction:column;gap:4px;padding-bottom:18px;border-bottom:1px solid var(--edge-b);}
+.contact-meta-lbl{font-family:var(--font-mono);font-size:.46rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim);}
+.contact-meta-val{font-family:'Outfit',sans-serif;font-weight:400;font-size:.95rem;color:#fff;}
+.contact-form{background:linear-gradient(145deg,rgba(22,36,71,.6),rgba(10,16,32,.85));backdrop-filter:blur(8px);border:1px solid var(--edge-b);padding:44px 40px;display:flex;flex-direction:column;gap:22px;}
+.form-row{display:flex;flex-direction:column;gap:8px;}
+.form-row label{font-family:var(--font-mono);font-size:.46rem;letter-spacing:3px;text-transform:uppercase;color:var(--dim);}
+.form-row input,.form-row textarea,.form-row select{background:transparent;border:none;border-bottom:1px solid var(--edge-b);padding:10px 0;font-family:'Outfit',sans-serif;font-size:.95rem;color:#fff;outline:none;transition:border-color .3s;resize:none;}
+.form-row input:focus,.form-row textarea:focus,.form-row select:focus{border-color:var(--red);}
+.form-row textarea{min-height:90px;}
+.form-row select option{background:var(--navy);color:#fff;}
+
+/* FOOTER */
+.footer{background:linear-gradient(180deg,#040608 0%,#080d18 100%);padding:80px 80px 40px;border-top:1px solid var(--edge-b);position:relative;z-index:2;}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:60px;max-width:1280px;margin:0 auto 60px;}
+.footer-brand .nav-logo{font-size:2rem;display:block;margin-bottom:20px;}
+.footer-brand p{font-size:.88rem;color:var(--muted);line-height:1.8;max-width:340px;}
+.footer-col h4{font-family:var(--font-mono);font-size:.5rem;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:20px;}
+.footer-col ul{list-style:none;display:flex;flex-direction:column;gap:12px;}
+.footer-col a{font-size:.85rem;color:var(--muted);text-decoration:none;transition:color .3s;}
+.footer-col a:hover{color:#fff;}
+.footer-bottom{max-width:1280px;margin:0 auto;padding-top:30px;border-top:1px solid var(--edge-b);display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;}
+.footer-copy{font-family:var(--font-mono);font-size:.48rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim);}
+
+/* RESPONSIVE */
+@media(max-width:1100px){
+  .hero{grid-template-columns:1fr;min-height:auto;}
+  .hero-body{padding:120px 32px 40px;max-width:100%;}
+  .hero-3d{height:auto;min-height:auto;padding:20px 32px 80px;}
+  .hero-3d-frame{max-width:380px;}
+  .hero-scroll{display:none;}
+}
+@media(max-width:1024px){
+  .nav,.nav.stuck{padding:18px 32px;}
+  .nav-links{display:none;}
+  .ham{display:flex;}.mob-menu{display:flex;}
+  .section{padding:100px 32px;}
+  .solution-intro{padding:100px 32px;}
+  .caps-header{grid-template-columns:1fr;gap:32px;}
+  .caps-grid,.benefits-grid,.results-grid,.process-grid{grid-template-columns:repeat(2,1fr);}
+  .contact-grid,.footer-grid{grid-template-columns:1fr;gap:40px;}
+  .footer{padding:60px 32px 30px;}
+}
+@media(max-width:640px){
+  .problem-grid{grid-template-columns:1fr;}
+  .caps-grid,.benefits-grid,.results-grid,.process-grid{grid-template-columns:1fr;}
+  .problem-cta-band{padding:40px 28px;flex-direction:column;align-items:flex-start;gap:24px;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="ld-logo">
+    <span>Z</span><span>E</span><span>N</span><span>S</span><span>H</span><span>A</span>
+  </div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+  <div class="ld-sub">Initializing Revenue Systems</div>
+</div>
+
+<div id="cur-dot"></div>
+<div id="cur-ring"></div>
+
+<canvas id="site-bg"></canvas>
+
+<div id="zs-bar"></div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <a href="#" class="nav-logo">ZEN<em>SHA</em></a>
+  <div class="nav-links">
+    <a href="#problem">Problem</a>
+    <a href="#capabilities">Capabilities</a>
+    <a href="#results">Results</a>
+    <a href="#process">Process</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('contact').scrollIntoView()">Book Audit</button>
+  <button class="ham" id="ham"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="mob-menu" id="mobMenu">
+  <a href="#problem" class="mob-link">Problem</a>
+  <a href="#capabilities" class="mob-link">Capabilities</a>
+  <a href="#results" class="mob-link">Results</a>
+  <a href="#contact" class="mob-link">Contact</a>
+</div>
+
+<!-- HERO with 3D MODEL -->
+<section class="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-veil"></div>
+
+  <div class="hero-body">
+    <div class="hero-eyebrow">
+      <span class="hero-eyebrow-dot"></span>
+      <span class="hero-eyebrow-txt">AI Revenue Systems · Est. 2024</span>
+    </div>
+    <h1 class="hero-h1">
+      <span class="outline">Engineered</span><br/>
+      for <span class="red">Revenue.</span><br/>
+      <span class="navy">Built to Scale.</span>
+    </h1>
+    <p class="hero-sub">
+      We build <strong>autonomous AI systems</strong> that capture leads, qualify prospects, and close deals — while your team sleeps. No fluff. Just measurable revenue.
+    </p>
+    <div class="hero-btns">
+      <button class="btn-primary" onclick="document.getElementById('contact').scrollIntoView()">Book Free Audit →</button>
+      <button class="btn-ghost" onclick="document.getElementById('capabilities').scrollIntoView()">See Capabilities</button>
+    </div>
+  </div>
+
+  <div class="hero-3d">
+    <div class="hero-3d-frame">
+      <div class="hero-3d-ring2"></div>
+      <div class="hero-3d-ring"></div>
+      <div class="hero-3d-corners"></div>
+      <canvas id="model-canvas"></canvas>
+      <div class="hero-3d-label">Zensha <em>Core</em> · Revenue Engine v2.4</div>
+    </div>
+  </div>
+
+  <div class="hero-scroll">
+    <div class="hero-scroll-line"></div>
+    <div class="hero-scroll-lbl">Scroll</div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-track">
+    <span class="tick-item">AI Lead Generation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Voice Agents</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Chatbot Systems</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Sales Automation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">CRM Integration</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Custom AI Workflows</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">AI Lead Generation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Voice Agents</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Chatbot Systems</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Sales Automation</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">CRM Integration</span><span class="tick-item tick-dot">◆</span>
+    <span class="tick-item">Custom AI Workflows</span><span class="tick-item tick-dot">◆</span>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section class="section problem" id="problem">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">01</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">The Problem</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">Your team is <em>bleeding</em><br/><span class="dim-txt">revenue every hour.</span></h2>
+    <div class="problem-grid">
+      <div class="problem-card rev d1">
+        <span class="problem-icon">⏱</span>
+        <h3 class="problem-title">Slow Lead Response</h3>
+        <p class="problem-desc">Studies show <strong>78% of leads buy from the first responder</strong>. If you reply in hours — you've already lost.</p>
+      </div>
+      <div class="problem-card rev d2">
+        <span class="problem-icon">📞</span>
+        <h3 class="problem-title">Missed Calls = Lost Deals</h3>
+        <p class="problem-desc">Every missed call is <strong>$200-$2,000 in lost revenue</strong>. Your competitors are picking up while you're not.</p>
+      </div>
+      <div class="problem-card rev d3">
+        <span class="problem-icon">💸</span>
+        <h3 class="problem-title">Wasted Ad Spend</h3>
+        <p class="problem-desc">You pay for clicks, then <strong>70% of leads never get followed up</strong>. That's pure cash burned.</p>
+      </div>
+      <div class="problem-card rev d4">
+        <span class="problem-icon">🌙</span>
+        <h3 class="problem-title">After-Hours Black Hole</h3>
+        <p class="problem-desc">Half your inquiries arrive <strong>outside business hours</strong>. By morning, they've moved on.</p>
+      </div>
+    </div>
+    <div class="problem-cta-band rev d2">
+      <div class="problem-cta-txt">Sound familiar?<br/><em>We fix all of it.</em></div>
+      <button class="btn-primary" onclick="document.getElementById('contact').scrollIntoView()">Get Free Audit →</button>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUTION INTRO -->
+<section class="solution-intro">
+  <div class="sol-center">
+    <div class="sol-tag rev">The Zensha Method</div>
+    <h2 class="sol-h rev d1"><span class="out">Autonomous</span> systems that<br/><em>never sleep</em>, never miss.</h2>
+    <p class="sol-p rev d2">We deploy <strong>custom AI agents</strong> trained on your business — handling lead capture, qualification, booking, and follow-up automatically. You get a 24/7 sales engine that integrates with your existing stack.</p>
+  </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section class="section caps" id="capabilities">
+  <div class="wrap">
+    <div class="caps-header">
+      <div>
+        <div class="eyebrow rev">
+          <span class="eyebrow-num">02</span>
+          <span class="eyebrow-line"></span>
+          <span class="eyebrow-txt">Capabilities</span>
+          <span class="eyebrow-dot"></span>
+        </div>
+        <h2 class="section-h rev d1">What we<br/><em>build.</em></h2>
+      </div>
+      <p class="caps-intro rev d2">Production-grade AI systems deployed in weeks, not months. Each solution is custom-trained on your business and integrated with your existing CRM, calendar, and comms stack.</p>
+    </div>
+    <div class="caps-grid">
+      <div class="cap-card rev d1">
+        <div class="cap-num">// 01</div>
+        <div class="cap-icon">🤖</div>
+        <h3 class="cap-title">AI Voice Agents</h3>
+        <p class="cap-desc">Natural-sounding AI receptionists that answer calls 24/7, qualify leads, book appointments, and route hot prospects to your team in real-time.</p>
+        <div class="cap-tag">● Always On</div>
+      </div>
+      <div class="cap-card rev d2">
+        <div class="cap-num">// 02</div>
+        <div class="cap-icon">💬</div>
+        <h3 class="cap-title">Chatbot Systems</h3>
+        <p class="cap-desc">Custom-trained chatbots for your website, WhatsApp, and Instagram DMs. They answer FAQs, qualify leads, and book meetings instantly.</p>
+        <div class="cap-tag">● Multi-Channel</div>
+      </div>
+      <div class="cap-card rev d3">
+        <div class="cap-num">// 03</div>
+        <div class="cap-icon">⚡</div>
+        <h3 class="cap-title">Lead Automation</h3>
+        <p class="cap-desc">Automated follow-up sequences via SMS, email, and voice — triggered the moment a lead comes in. Nothing slips through the cracks.</p>
+        <div class="cap-tag">● Instant Reply</div>
+      </div>
+      <div class="cap-card rev d4">
+        <div class="cap-num">// 04</div>
+        <div class="cap-icon">🔗</div>
+        <h3 class="cap-title">CRM Integration</h3>
+        <p class="cap-desc">Seamless integration with HubSpot, Salesforce, Pipedrive, GoHighLevel, and more. Every interaction logged and tracked automatically.</p>
+        <div class="cap-tag">● Plug & Play</div>
+      </div>
+      <div class="cap-card rev d5">
+        <div class="cap-num">// 05</div>
+        <div class="cap-icon">📊</div>
+        <h3 class="cap-title">Sales Analytics</h3>
+        <p class="cap-desc">Real-time dashboards showing lead source, conversion rates, AI performance, and revenue attribution — so you know exactly what's working.</p>
+        <div class="cap-tag">● Data-Driven</div>
+      </div>
+      <div class="cap-card rev d6">
+        <div class="cap-num">// 06</div>
+        <div class="cap-icon">⚙️</div>
+        <h3 class="cap-title">Custom Workflows</h3>
+        <p class="cap-desc">Bespoke AI workflows tailored to your unique business logic. From onboarding to retention — we automate the repetitive, scale the strategic.</p>
+        <div class="cap-tag">● Tailored</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section class="section benefits">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">03</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Outcomes</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">The <em>numbers</em><br/><span class="dim-txt">that matter.</span></h2>
+    <div class="benefits-grid">
+      <div class="benefit rev d1">
+        <div class="benefit-num">3×</div>
+        <h3 class="benefit-title">Faster Lead Response</h3>
+        <p class="benefit-desc">From hours to seconds. Catch leads while they're still hot and ready to buy.</p>
+      </div>
+      <div class="benefit rev d2">
+        <div class="benefit-num">+47%</div>
+        <h3 class="benefit-title">Higher Conversion Rate</h3>
+        <p class="benefit-desc">Consistent, qualified follow-up drives more booked calls and signed deals.</p>
+      </div>
+      <div class="benefit rev d3">
+        <div class="benefit-num">-60%</div>
+        <h3 class="benefit-title">Lower Cost Per Lead</h3>
+        <p class="benefit-desc">Maximize ROI on existing ad spend by converting more of what you already pay for.</p>
+      </div>
+      <div class="benefit rev d4">
+        <div class="benefit-num">24/7</div>
+        <h3 class="benefit-title">Coverage</h3>
+        <p class="benefit-desc">Nights, weekends, holidays — your AI sales engine never clocks out.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section class="section results" id="results">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">04</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Results</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">Don't take<br/><em>our word</em> for it.</h2>
+    <div class="results-grid">
+      <div class="result-card rev d1">
+        <div class="result-quote">"</div>
+        <p class="result-text">Zensha's AI voice agent booked 38 qualified appointments in the first 30 days. We had to hire a second closer just to keep up.</p>
+        <div class="result-author">
+          <span class="result-name">Marcus Reeve</span>
+          <span class="result-role">CEO · Apex Roofing</span>
+        </div>
+      </div>
+      <div class="result-card rev d2">
+        <div class="result-quote">"</div>
+        <p class="result-text">We cut our cost-per-acquisition by 54% in the first quarter. The ROI was undeniable — and it just keeps compounding.</p>
+        <div class="result-author">
+          <span class="result-name">Sofia Caldwell</span>
+          <span class="result-role">CMO · NorthStar Legal</span>
+        </div>
+      </div>
+      <div class="result-card rev d3">
+        <div class="result-quote">"</div>
+        <p class="result-text">The chatbot handles 80% of our inbound inquiries autonomously. My team finally has time to focus on closing — not chasing.</p>
+        <div class="result-author">
+          <span class="result-name">David Khan</span>
+          <span class="result-role">Founder · Vertex Fitness</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section class="section process" id="process">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">05</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Process</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">From audit to<br/><em>autonomous</em> in 30 days.</h2>
+    <div class="process-grid">
+      <div class="step rev d1">
+        <div class="step-num">01</div>
+        <h3 class="step-title">Discovery Audit</h3>
+        <p class="step-desc">We map your sales funnel, identify revenue leaks, and pinpoint exactly where AI delivers maximum impact.</p>
+      </div>
+      <div class="step rev d2">
+        <div class="step-num">02</div>
+        <h3 class="step-title">System Design</h3>
+        <p class="step-desc">We architect a custom AI system around your stack — choosing the right agents, tools, and workflows for your business.</p>
+      </div>
+      <div class="step rev d3">
+        <div class="step-num">03</div>
+        <h3 class="step-title">Build & Train</h3>
+        <p class="step-desc">We deploy your AI agents, train them on your data and tone of voice, and stress-test every flow before launch.</p>
+      </div>
+      <div class="step rev d4">
+        <div class="step-num">04</div>
+        <h3 class="step-title">Launch & Optimize</h3>
+        <p class="step-desc">We go live, monitor performance in real-time, and continuously optimize for higher conversion and lower cost.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section faq" id="faq">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">06</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Questions</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">Frequently<br/><em>asked.</em></h2>
+    <div class="faq-list">
+      <div class="faq-item rev d1">
+        <button class="faq-q">How long until I see results?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">Most clients see measurable lift within the first 14 days post-launch. Full ROI typically lands in 30-60 days as the system optimizes and your team adapts to the new lead volume.</div></div>
+      </div>
+      <div class="faq-item rev d2">
+        <button class="faq-q">What does it cost?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">Pricing is custom based on scope. Most engagements range from $5K-$25K for initial build, plus a monthly retainer for hosting, optimization, and support. We only take you on if we're confident in the ROI.</div></div>
+      </div>
+      <div class="faq-item rev d3">
+        <button class="faq-q">Will the AI sound robotic?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">No. We use the latest generation of voice models that are virtually indistinguishable from humans. Most callers don't realize they're speaking to AI — until you tell them.</div></div>
+      </div>
+      <div class="faq-item rev d4">
+        <button class="faq-q">Does it integrate with my CRM?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">Yes. We integrate with all major CRMs including HubSpot, Salesforce, Pipedrive, GoHighLevel, Close, and Zoho. If you use something custom, we'll connect via API or Zapier.</div></div>
+      </div>
+      <div class="faq-item rev d5">
+        <button class="faq-q">What if it doesn't work for my industry?<span class="faq-icon">+</span></button>
+        <div class="faq-a"><div class="faq-a-inner">We start with a free audit specifically to determine fit. If we don't see a clear path to ROI, we'll tell you upfront. We've deployed in legal, real estate, healthcare, fitness, home services, e-commerce, and SaaS.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="section contact" id="contact">
+  <div class="wrap">
+    <div class="eyebrow rev">
+      <span class="eyebrow-num">07</span>
+      <span class="eyebrow-line"></span>
+      <span class="eyebrow-txt">Contact</span>
+      <span class="eyebrow-dot"></span>
+    </div>
+    <h2 class="section-h rev d1">Let's build your<br/><em>revenue engine.</em></h2>
+    <div class="contact-grid">
+      <div class="contact-info rev d1">
+        <p>Book a <strong>free 30-minute audit</strong>. We'll map your funnel, identify your biggest revenue leaks, and show you exactly where AI can move the needle — no obligation.</p>
+        <div class="contact-meta">
+          <div class="contact-meta-item">
+            <span class="contact-meta-lbl">Email</span>
+            <span class="contact-meta-val">hello@zensha.ai</span>
+          </div>
+          <div class="contact-meta-item">
+            <span class="contact-meta-lbl">Response Time</span>
+            <span class="contact-meta-val">&lt; 4 hours, business days</span>
+          </div>
+          <div class="contact-meta-item">
+            <span class="contact-meta-lbl">Based In</span>
+            <span class="contact-meta-val">Remote · Global Delivery</span>
+          </div>
+        </div>
+      </div>
+      <form class="contact-form rev d2" onsubmit="event.preventDefault();alert('Thanks! We\'ll be in touch within 4 hours.');this.reset();">
+        <div class="form-row">
+          <label>Full Name</label>
+          <input type="text" required placeholder="Jane Doe"/>
+        </div>
+        <div class="form-row">
+          <label>Work Email</label>
+          <input type="email" required placeholder="jane@company.com"/>
+        </div>
+        <div class="form-row">
+          <label>Company</label>
+          <input type="text" required placeholder="Company Inc."/>
+        </div>
+        <div class="form-row">
+          <label>Monthly Revenue</label>
+          <select required>
+            <option value="">Select range</option>
+            <option>Under $10K</option>
+            <option>$10K - $50K</option>
+            <option>$50K - $250K</option>
+            <option>$250K+</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>What's your biggest bottleneck?</label>
+          <textarea required placeholder="Tell us about your current sales process..."></textarea>
+        </div>
+        <button type="submit" class="btn-primary">Book Free Audit →</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <a href="#" class="nav-logo">ZEN<em>SHA</em></a>
+      <p>AI revenue systems for ambitious companies. We build, deploy, and optimize autonomous sales infrastructure that runs 24/7.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <ul>
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#capabilities">Capabilities</a></li>
+        <li><a href="#results">Results</a></li>
+        <li><a href="#process">Process</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Resources</h4>
+      <ul>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#">Case Studies</a></li>
+        <li><a href="#">Blog</a></li>
+        <li><a href="#">Privacy</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Connect</h4>
+      <ul>
+        <li><a href="#">LinkedIn</a></li>
+        <li><a href="#">Twitter / X</a></li>
+        <li><a href="mailto:hello@zensha.ai">Email</a></li>
+        <li><a href="#contact">Book Audit</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2024 Zensha · All Systems Operational</div>
+    <div class="footer-copy">Engineered for revenue</div>
+  </div>
+</footer>
+
+<script>
+// LOADER
+window.addEventListener('load',()=>{
+  setTimeout(()=>document.getElementById('loader').classList.add('out'),2000);
+});
+
+// CURSOR
+(function(){
+  const dot=document.getElementById('cur-dot'),ring=document.getElementById('cur-ring');
+  if(!dot)return;
+  let mx=0,my=0,rx=0,ry=0;
+  window.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
+  function tick(){rx+=(mx-rx)*.18;ry+=(my-ry)*.18;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(tick);}
+  tick();
+})();
+
+// SCROLL BAR + NAV
+const nav=document.getElementById('nav'),bar=document.getElementById('zs-bar');
+window.addEventListener('scroll',()=>{
+  const s=window.scrollY,h=document.documentElement.scrollHeight-window.innerHeight;
+  bar.style.width=(s/h*100)+'%';
+  if(s>50)nav.classList.add('stuck');else nav.classList.remove('stuck');
+});
+
+// MOBILE MENU
+const ham=document.getElementById('ham'),mob=document.getElementById('mobMenu');
+ham.addEventListener('click',()=>{ham.classList.toggle('open');mob.classList.toggle('open');});
+document.querySelectorAll('.mob-link').forEach(l=>l.addEventListener('click',()=>{ham.classList.remove('open');mob.classList.remove('open');}));
+
+// REVEAL ON SCROLL
+const io=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');});
+},{threshold:.12,rootMargin:'0px 0px -60px 0px'});
+document.querySelectorAll('.rev').forEach(el=>io.observe(el));
+
+// FAQ ACCORDION
+document.querySelectorAll('.faq-q').forEach(q=>{
+  q.addEventListener('click',()=>{
+    const item=q.parentElement,answer=item.querySelector('.faq-a');
+    const isOpen=item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i=>{i.classList.remove('open');i.querySelector('.faq-a').style.maxHeight=null;});
+    if(!isOpen){item.classList.add('open');answer.style.maxHeight=answer.scrollHeight+'px';}
+  });
+});
+
+// SITE-WIDE WEBGL BACKGROUND (navy + red + white particles)
+(function(){
+  const canvas=document.getElementById('site-bg');
+  if(!canvas||!window.THREE)return;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,1,2000);
+  camera.position.z=600;
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth,window.innerHeight);
+
+  const count=600;
+  const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    pos[i*3]=(Math.random()-0.5)*1800;
+    pos[i*3+1]=(Math.random()-0.5)*1200;
+    pos[i*3+2]=(Math.random()-0.5)*1200;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  // Navy blue layer
+  const matNavy=new THREE.PointsMaterial({color:0x4a6fb5,size:1.5,transparent:true,opacity:.45,sizeAttenuation:true});
+  const pointsNavy=new THREE.Points(geo,matNavy);
+  scene.add(pointsNavy);
+  // Red accents
+  const matRed=new THREE.PointsMaterial({color:0xe8001a,size:1.4,transparent:true,opacity:.4,sizeAttenuation:true});
+  const pointsRed=new THREE.Points(geo.clone(),matRed);
+  scene.add(pointsRed);
+  // White highlights
+  const matWhite=new THREE.PointsMaterial({color:0xffffff,size:.8,transparent:true,opacity:.3,sizeAttenuation:true});
+  const pointsWhite=new THREE.Points(geo.clone(),matWhite);
+  scene.add(pointsWhite);
+
+  let mx=0,my=0;
+  window.addEventListener('mousemove',e=>{mx=(e.clientX/window.innerWidth-.5)*2;my=(e.clientY/window.innerHeight-.5)*2;});
+  window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+
+  function animate(){
+    pointsNavy.rotation.y+=.0006;pointsNavy.rotation.x+=.0003;
+    pointsRed.rotation.y+=.0008;pointsRed.rotation.x-=.0002;
+    pointsWhite.rotation.y-=.0005;pointsWhite.rotation.x+=.0002;
+    camera.position.x+=(mx*40-camera.position.x)*.03;
+    camera.position.y+=(-my*40-camera.position.y)*.03;
+    camera.lookAt(scene.position);
+    renderer.render(scene,camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// HERO CANVAS (navy/grey grid background)
+(function(){
+  const canvas=document.getElementById('hero-canvas');
+  if(!canvas||!window.THREE)return;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(70,canvas.clientWidth/canvas.clientHeight,1,2000);
+  camera.position.set(0,80,420);
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(canvas.clientWidth,canvas.clientHeight);
+
+  // Grid floor (navy)
+  const grid=new THREE.GridHelper(2000,40,0x2a4480,0x1a2a55);
+  grid.position.y=-150;
+  grid.material.transparent=true;
+  grid.material.opacity=.35;
+  scene.add(grid);
+
+  // White dot field
+  const pcount=300;
+  const pgeo=new THREE.BufferGeometry();
+  const ppos=new Float32Array(pcount*3);
+  for(let i=0;i<pcount;i++){
+    ppos[i*3]=(Math.random()-0.5)*900;
+    ppos[i*3+1]=(Math.random()-0.5)*600;
+    ppos[i*3+2]=(Math.random()-0.5)*600;
+  }
+  pgeo.setAttribute('position',new THREE.BufferAttribute(ppos,3));
+  const pmat=new THREE.PointsMaterial({color:0xffffff,size:1.2,transparent:true,opacity:.35,sizeAttenuation:true});
+  scene.add(new THREE.Points(pgeo,pmat));
+
+  let mx=0,my=0;
+  window.addEventListener('mousemove',e=>{mx=(e.clientX/window.innerWidth-.5)*2;my=(e.clientY/window.innerHeight-.5)*2;});
+  window.addEventListener('resize',()=>{
+    camera.aspect=canvas.clientWidth/canvas.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(canvas.clientWidth,canvas.clientHeight);
+  });
+
+  function animate(){
+    grid.rotation.y+=.001;
+    camera.position.x+=(mx*60-camera.position.x)*.05;
+    camera.position.y+=(80+(-my*40)-camera.position.y)*.05;
+    camera.lookAt(scene.position);
+    renderer.render(scene,camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// 3D MODEL — interactive icosahedron with navy + red + white materials
+(function(){
+  const canvas=document.getElementById('model-canvas');
+  if(!canvas||!window.THREE)return;
+  const scene=new THREE.Scene();
+  const w=canvas.clientWidth||500,h=canvas.clientHeight||500;
+  const camera=new THREE.PerspectiveCamera(50,w/h,.1,1000);
+  camera.position.z=5;
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(w,h);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff,.4));
+  const navyLight=new THREE.DirectionalLight(0x4a7fff,1.2);
+  navyLight.position.set(-3,2,4);
+  scene.add(navyLight);
+  const redLight=new THREE.PointLight(0xe8001a,2,10);
+  redLight.position.set(3,-1,2);
+  scene.add(redLight);
+  const whiteLight=new THREE.DirectionalLight(0xffffff,.6);
+  whiteLight.position.set(2,4,3);
+  scene.add(whiteLight);
+
+  const group=new THREE.Group();
+  scene.add(group);
+
+  // Core icosahedron - navy with grey
+  const coreGeo=new THREE.IcosahedronGeometry(1.2,1);
+  const coreMat=new THREE.MeshStandardMaterial({
+    color:0x1a2a55,
+    metalness:.85,
+    roughness:.25,
+    emissive:0x0a1530,
+    emissiveIntensity:.3,
+    flatShading:true
+  });
+  const core=new THREE.Mesh(coreGeo,coreMat);
+  group.add(core);
+
+  // Wireframe overlay - white
+  const wireGeo=new THREE.IcosahedronGeometry(1.22,1);
+  const wireMat=new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.18});
+  group.add(new THREE.Mesh(wireGeo,wireMat));
+
+  // Outer wireframe - red
+  const outerGeo=new THREE.IcosahedronGeometry(1.8,1);
+  const outerMat=new THREE.MeshBasicMaterial({color:0xe8001a,wireframe:true,transparent:true,opacity:.4});
+  const outer=new THREE.Mesh(outerGeo,outerMat);
+  group.add(outer);
+
+  // Outer dodecahedron - grey/navy
+  const dodecGeo=new THREE.DodecahedronGeometry(2.3,0);
+  const dodecMat=new THREE.MeshBasicMaterial({color:0x4a6fb5,wireframe:true,transparent:true,opacity:.22});
+  const dodec=new THREE.Mesh(dodecGeo,dodecMat);
+  group.add(dodec);
+
+  // Floating accent points
+  const pcount=80;
+  const pgeo=new THREE.BufferGeometry();
+  const ppos=new Float32Array(pcount*3);
+  for(let i=0;i<pcount;i++){
+    const r=2.6+Math.random()*.6;
+    const t=Math.random()*Math.PI*2;
+    const p=Math.acos(2*Math.random()-1);
+    ppos[i*3]=r*Math.sin(p)*Math.cos(t);
+    ppos[i*3+1]=r*Math.sin(p)*Math.sin(t);
+    ppos[i*3+2]=r*Math.cos(p);
+  }
+  pgeo.setAttribute('position',new THREE.BufferAttribute(ppos,3));
+  const pmat=new THREE.PointsMaterial({color:0xffffff,size:.05,transparent:true,opacity:.85});
+  const points=new THREE.Points(pgeo,pmat);
+  group.add(points);
+
+  // Red accent points
+  const pcount2=30;
+  const pgeo2=new THREE.BufferGeometry();
+  const ppos2=new Float32Array(pcount2*3);
+  for(let i=0;i<pcount2;i++){
+    const r=2.0+Math.random()*.8;
+    const t=Math.random()*Math.PI*2;
+    const p=Math.acos(2*Math.random()-1);
+    ppos2[i*3]=r*Math.sin(p)*Math.cos(t);
+    ppos2[i*3+1]=r*Math.sin(p)*Math.sin(t);
+    ppos2[i*3+2]=r*Math.cos(p);
+  }
+  pgeo2.setAttribute('position',new THREE.BufferAttribute(ppos2,3));
+  const pmat2=new THREE.PointsMaterial({color:0xe8001a,size:.08,transparent:true,opacity:.9});
+  const points2=new THREE.Points(pgeo2,pmat2);
+  group.add(points2);
+
+  let mx=0,my=0,tx=0,ty=0;
+  canvas.parentElement.addEventListener('mousemove',e=>{
+    const r=canvas.getBoundingClientRect();
+    mx=((e.clientX-r.left)/r.width-.5)*2;
+    my=((e.clientY-r.top)/r.height-.5)*2;
+  });
+  canvas.parentElement.addEventListener('mouseleave',()=>{mx=0;my=0;});
+
+  function resize(){
+    const w=canvas.clientWidth,h=canvas.clientHeight;
+    camera.aspect=w/h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w,h,false);
+  }
+  window.addEventListener('resize',resize);
+  resize();
+
+  let t=0;
+  function animate(){
+    t+=.01;
+    tx+=(mx*.6-tx)*.06;
+    ty+=(my*.6-ty)*.06;
+    group.rotation.y+=.004;
+    group.rotation.x=ty*.3;
+    group.rotation.z=tx*.15;
+    core.rotation.x-=.003;
+    core.rotation.y-=.002;
+    outer.rotation.x+=.002;
+    outer.rotation.z+=.003;
+    dodec.rotation.y-=.0015;
+    dodec.rotation.x+=.0008;
+    points.rotation.y-=.002;
+    points2.rotation.y+=.003;
+    points2.rotation.x+=.001;
+    // Subtle scale breathe
+    const s=1+Math.sin(t)*.02;
+    group.scale.set(s,s,s);
+    renderer.render(scene,camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// HERO PARALLAX
+const heroBody=document.querySelector('.hero-body');
+window.addEventListener('scroll',()=>{
+  const s=window.scrollY;
+  if(s<window.innerHeight&&heroBody){
+    heroBody.style.transform=`translateY(${s*0.18}px)`;
+    heroBody.style.opacity=Math.max(0,1-s/(window.innerHeight*.85));
+  }
+});
+
+// PROBLEM CARDS 3D TILT
+document.querySelectorAll('.problem-card').forEach(card=>{
+  card.addEventListener('mousemove',e=>{
+    const r=card.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width-.5;
+    const y=(e.clientY-r.top)/r.height-.5;
+    card.style.transform=`rotateY(${x*8}deg) rotateX(${-y*8}deg) translateZ(10px)`;
+  });
+  card.addEventListener('mouseleave',()=>{card.style.transform='';});
+});
+
+// SMOOTH ANCHOR SCROLL OFFSET
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    const id=a.getAttribute('href');
+    if(id.length>1){
+      const t=document.querySelector(id);
+      if(t){e.preventDefault();window.scrollTo({top:t.offsetTop-60,behavior:'smooth'});}
+    }
+  });
+});
+</script>
+
+</body>
+</html>
